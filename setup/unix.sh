@@ -32,7 +32,9 @@ haxelib install flixel-tools
 haxelib install tjson
 haxelib install hxvlc --skip-dependencies
 haxelib git hscript-insanity https://github.com/inky03/hscript-insanity.git 26d72f5f83dc705587771597da257caa5aa6e1c3
-haxelib git flixel-animate https://github.com/Dot-Stuff/flxanimate.git dev
+# FIX: flixel-animate (package "animate") lives in MaybeMaru's repo.
+# Dot-Stuff/flxanimate is the old library (package "flxanimate") and breaks "import animate.FlxAnimateFrames".
+haxelib git flixel-animate https://github.com/MaybeMaru/flixel-animate.git
 haxelib git linc_luajit https://github.com/superpowers04/linc_luajit.git
 haxelib git funkin.vis https://github.com/FunkinCrew/funkVis.git 1966f8fbbbc509ed90d4b520f3c49c084fc92fd6
 haxelib git grig.audio https://gitlab.com/haxe-grig/grig.audio.git
@@ -41,6 +43,15 @@ echo "Dependencies installed!"
 if [ "$MODE" = "setup-only" ]; then
 	echo "Done. Run 'haxelib run lime setup android' once if Lime is not configured yet."
 	exit 0
+fi
+
+# FIX: GitHub runners predefine ANDROID_NDK_ROOT (r27). If the requested NDK is installed, force it.
+if [ -n "$ANDROID_NDK_VERSION" ]; then
+	SDK_DIR="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+	if [ -n "$SDK_DIR" ] && [ -d "$SDK_DIR/ndk/$ANDROID_NDK_VERSION" ]; then
+		export ANDROID_NDK_ROOT="$SDK_DIR/ndk/$ANDROID_NDK_VERSION"
+		echo "Using NDK $ANDROID_NDK_VERSION at $ANDROID_NDK_ROOT"
+	fi
 fi
 
 # Configure Lime from env vars if they are set
@@ -67,7 +78,7 @@ if [ ! -f key.keystore ]; then
 		-alias KEYSTORE_ALIAS \
 		-keypass KEYSTORE_ALIAS_PASSWORD \
 		-keyalg RSA -keysize 2048 -validity 10000 \
-		-dname "CN=PsychEngineMint, OU=None, O=None, L=None, S=None, C=US"
+		-dname "CN=PsychEngineMint, OU=None, O=None, L=None, ST=None, C=US"
 fi
 
 # The project file may be named Project.xml or project.xml (Linux is case-sensitive)
