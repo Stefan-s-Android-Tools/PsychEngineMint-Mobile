@@ -50,7 +50,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      # Platform + build-tools + NDK en un solo cache
+      # Cache platform, build-tools and NDK together
       - name: Cache Android SDK parts
         id: sdk-cache
         uses: actions/cache@v4
@@ -66,16 +66,13 @@ jobs:
         run: |
           sdkmanager --install "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" "ndk;$ANDROID_NDK_VERSION"
 
-      # NDK r23+ ya no trae los binutils con prefijo (arm-linux-androideabi-ar,
-      # aarch64-linux-android-ranlib, etc.) pero hxcpp 4.3.2 los sigue pidiendo al
-      # armar la libreria estatica. Se apuntan a llvm-ar / llvm-ranlib.
-      # Tiene que ir antes del paso Compile.
+      # New NDKs removed the old ar/ranlib names that hxcpp still looks for
       - name: Fix NDK legacy tool names for hxcpp
         run: |
           BIN="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
           for t in llvm-ar llvm-ranlib; do
             if [ ! -x "$BIN/$t" ]; then
-              echo "Falta $t en $BIN"
+              echo "Missing $t in $BIN"
               ls "$BIN"
               exit 1
             fi
@@ -98,7 +95,7 @@ jobs:
           path: ~/haxelib
           key: haxelib-${{ runner.os }}-${{ hashFiles('setup/**', 'Project.xml') }}
 
-      # Solo restaura; el guardado de hxcpp se hace aparte, despues de compilar.
+      # Restore only, it gets saved after the build
       - name: Restore hxcpp objects
         uses: actions/cache/restore@v4
         with:
@@ -160,8 +157,7 @@ jobs:
       - name: Compile
         run: haxelib run lime build Project.xml android -D officialBuild
 
-      # always(): si el build falla a mitad, igual se guardan los objetos ya compilados.
-      # No guarda en PRs para no llenar el limite de 10 GB de cache del repo.
+      # Save even if the build fails, but not on PRs
       - name: Save hxcpp objects
         if: ${{ always() && github.event_name != 'pull_request' }}
         uses: actions/cache/save@v4
@@ -196,4 +192,3 @@ jobs:
           tag_name: ${{ inputs.version }}
           name: ${{ inputs.version }}
           files: ${{ steps.apk.outputs.path }}
-apk.outputs.path }}
