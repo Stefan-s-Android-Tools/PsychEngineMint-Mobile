@@ -156,6 +156,8 @@
 
 	<!-- Other -->
 	<haxelib name="grig.audio" />
+	
+	<haxelib name="extension-androidtools" />
 	<haxelib name="funkin.vis" />
 
 	<haxedef name="NO_PRECOMPILED_HEADERS" />
