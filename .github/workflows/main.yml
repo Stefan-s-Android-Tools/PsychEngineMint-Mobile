@@ -66,6 +66,26 @@ jobs:
         run: |
           sdkmanager --install "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILD_TOOLS" "ndk;$ANDROID_NDK_VERSION"
 
+      # NDK r23+ ya no trae los binutils con prefijo (arm-linux-androideabi-ar,
+      # aarch64-linux-android-ranlib, etc.) pero hxcpp 4.3.2 los sigue pidiendo al
+      # armar la libreria estatica. Se apuntan a llvm-ar / llvm-ranlib.
+      # Tiene que ir ANTES de setup/unix.sh, porque ese script ya compila.
+      - name: Fix NDK legacy tool names for hxcpp
+        run: |
+          BIN="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for t in llvm-ar llvm-ranlib; do
+            if [ ! -x "$BIN/$t" ]; then
+              echo "Falta $t en $BIN"
+              ls "$BIN"
+              exit 1
+            fi
+          done
+          for p in arm-linux-androideabi aarch64-linux-android; do
+            ln -sf llvm-ar "$BIN/$p-ar"
+            ln -sf llvm-ranlib "$BIN/$p-ranlib"
+          done
+          ls -l "$BIN"/*-ar "$BIN"/*-ranlib
+
       - name: Setup Haxe
         uses: krdlab/setup-haxe@master
         with:
@@ -77,6 +97,26 @@ jobs:
         with:
           path: ~/haxelib
           key: haxelib-${{ runner.os }}-${{ hashFiles('setup/**', 'Project.xml') }}
+
+      # Estos dos caches van ANTES de setup/unix.sh: ese script tambien compila el juego
+      # cuando el cache de haxelib no existe, asi que necesita los objetos ya restaurados.
+      # Solo restaura; el guardado de hxcpp se hace aparte, despues de compilar.
+      - name: Restore hxcpp objects
+        uses: actions/cache/restore@v4
+        with:
+          path: .hxcpp_cache
+          key: hxcpp-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            hxcpp-${{ runner.os }}-
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('Project.xml') }}
+          restore-keys: gradle-${{ runner.os }}-
 
       - name: Install Haxe dependencies
         if: steps.haxelib-cache.outputs.cache-hit != 'true'
@@ -106,24 +146,6 @@ jobs:
           haxelib run lime config JAVA_HOME "$JAVA_HOME"
           haxelib run lime config ANDROID_SETUP true
 
-      # Solo restaura; el guardado se hace aparte, después de compilar
-      - name: Restore hxcpp objects
-        uses: actions/cache/restore@v4
-        with:
-          path: .hxcpp_cache
-          key: hxcpp-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            hxcpp-${{ runner.os }}-
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('Project.xml') }}
-          restore-keys: gradle-${{ runner.os }}-
-
       - name: Generate placeholder keystore if missing
         run: |
           if [ ! -f key.keystore ]; then
@@ -141,7 +163,7 @@ jobs:
         run: haxelib run lime build Project.xml android -D officialBuild
 
       # always(): si el build falla a mitad, igual se guardan los objetos ya compilados.
-      # No guarda en PRs para no llenar el límite de 10 GB de cache del repo.
+      # No guarda en PRs para no llenar el limite de 10 GB de cache del repo.
       - name: Save hxcpp objects
         if: ${{ always() && github.event_name != 'pull_request' }}
         uses: actions/cache/save@v4
