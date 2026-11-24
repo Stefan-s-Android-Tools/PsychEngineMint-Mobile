@@ -168,6 +168,7 @@ class CharacterEditorState extends ScriptedState implements PsychUIEventHandler.
 
 		#if mobile
 		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
+		addTouchPadCamera();
 		#end
 
 		super.create();
@@ -829,7 +830,7 @@ class CharacterEditorState extends ScriptedState implements PsychUIEventHandler.
 		var shiftMult:Float = 1;
 		var ctrlMult:Float = 1;
 		var shiftMultBig:Float = 1;
-		if(FlxG.keys.pressed.SHIFT)
+		if(FlxG.keys.pressed.SHIFT #if mobile || touchPad.buttonC.pressed #end)
 		{
 			shiftMult = 4;
 			shiftMultBig = 10;
@@ -837,18 +838,19 @@ class CharacterEditorState extends ScriptedState implements PsychUIEventHandler.
 		if(FlxG.keys.pressed.CONTROL) ctrlMult = 0.25;
 
 		// CAMERA CONTROLS
-		if (FlxG.keys.pressed.J) FlxG.camera.scroll.x -= elapsed * 500 * shiftMult * ctrlMult;
-		if (FlxG.keys.pressed.K) FlxG.camera.scroll.y += elapsed * 500 * shiftMult * ctrlMult;
-		if (FlxG.keys.pressed.L) FlxG.camera.scroll.x += elapsed * 500 * shiftMult * ctrlMult;
-		if (FlxG.keys.pressed.I) FlxG.camera.scroll.y -= elapsed * 500 * shiftMult * ctrlMult;
+		var padPan:Bool = #if mobile touchPad.buttonG.pressed #else false #end;
+		if (FlxG.keys.pressed.J || (padPan && touchPad.buttonLeft.pressed)) FlxG.camera.scroll.x -= elapsed * 500 * shiftMult * ctrlMult;
+		if (FlxG.keys.pressed.K || (padPan && touchPad.buttonDown.pressed)) FlxG.camera.scroll.y += elapsed * 500 * shiftMult * ctrlMult;
+		if (FlxG.keys.pressed.L || (padPan && touchPad.buttonRight.pressed)) FlxG.camera.scroll.x += elapsed * 500 * shiftMult * ctrlMult;
+		if (FlxG.keys.pressed.I || (padPan && touchPad.buttonUp.pressed)) FlxG.camera.scroll.y -= elapsed * 500 * shiftMult * ctrlMult;
 
 		var lastZoom = FlxG.camera.zoom;
-		if(FlxG.keys.justPressed.R && !FlxG.keys.pressed.CONTROL) FlxG.camera.zoom = 1;
-		else if (FlxG.keys.pressed.E && FlxG.camera.zoom < 3) {
+		if((FlxG.keys.justPressed.R && !FlxG.keys.pressed.CONTROL) #if mobile || touchPad.buttonZ.justPressed #end) FlxG.camera.zoom = 1;
+		else if ((FlxG.keys.pressed.E #if mobile || touchPad.buttonX.pressed #end) && FlxG.camera.zoom < 3) {
 			FlxG.camera.zoom += elapsed * FlxG.camera.zoom * shiftMult * ctrlMult;
 			if(FlxG.camera.zoom > 3) FlxG.camera.zoom = 3;
 		}
-		else if (FlxG.keys.pressed.Q && FlxG.camera.zoom > 0.1) {
+		else if ((FlxG.keys.pressed.Q #if mobile || touchPad.buttonY.pressed #end) && FlxG.camera.zoom > 0.1) {
 			FlxG.camera.zoom -= elapsed * FlxG.camera.zoom * shiftMult * ctrlMult;
 			if(FlxG.camera.zoom < 0.1) FlxG.camera.zoom = 0.1;
 		}
@@ -859,8 +861,8 @@ class CharacterEditorState extends ScriptedState implements PsychUIEventHandler.
 		var changedAnim:Bool = false;
 		if(anims.length > 1)
 		{
-			if(FlxG.keys.justPressed.W && (changedAnim = true)) curAnim--;
-			else if(FlxG.keys.justPressed.S && (changedAnim = true)) curAnim++;
+			if((FlxG.keys.justPressed.W #if mobile || touchPad.buttonV.justPressed #end) && (changedAnim = true)) curAnim--;
+			else if((FlxG.keys.justPressed.S #if mobile || touchPad.buttonD.justPressed #end) && (changedAnim = true)) curAnim++;
 			
 			if (FlxG.mouse.justPressed && FlxG.mouse.overlaps(animsTxt, camHUD)) {
 				var p:Float = FlxMath.remapToRange(FlxG.mouse.getWorldPosition(camHUD).y, animsTxt.y, animsTxt.y + animsTxt.textField.textHeight, 0, anims.length);
@@ -881,8 +883,13 @@ class CharacterEditorState extends ScriptedState implements PsychUIEventHandler.
 		}
 
 		var changedOffset = false;
+		#if mobile
+		var moveKeysP = !touchPad.buttonG.pressed ? [touchPad.buttonLeft.justPressed, touchPad.buttonRight.justPressed, touchPad.buttonUp.justPressed, touchPad.buttonDown.justPressed] : [false, false, false, false];
+		var moveKeys = !touchPad.buttonG.pressed ? [touchPad.buttonLeft.pressed, touchPad.buttonRight.pressed, touchPad.buttonUp.pressed, touchPad.buttonDown.pressed] : [false, false, false, false];
+		#else
 		var moveKeysP = [FlxG.keys.justPressed.LEFT, FlxG.keys.justPressed.RIGHT, FlxG.keys.justPressed.UP, FlxG.keys.justPressed.DOWN];
 		var moveKeys = [FlxG.keys.pressed.LEFT, FlxG.keys.pressed.RIGHT, FlxG.keys.pressed.UP, FlxG.keys.pressed.DOWN];
+		#end
 		if(moveKeysP.contains(true))
 		{
 			character.offset.x += ((moveKeysP[0] ? 1 : 0) - (moveKeysP[1] ? 1 : 0)) * shiftMultBig;
@@ -1000,15 +1007,27 @@ class CharacterEditorState extends ScriptedState implements PsychUIEventHandler.
 		frameAdvanceText.color = clr;
 
 		// OTHER CONTROLS
+		#if mobile
+		if(touchPad.buttonA.justPressed)
+		{
+			undoOffsets = [character.offset.x, character.offset.y];
+			character.offset.x = copiedOffset[0];
+			character.offset.y = copiedOffset[1];
+			changedOffset = true;
+		}
+		if(touchPad.buttonS.justPressed)
+			silhouettes.visible = !silhouettes.visible;
+		#end
+
 		if(FlxG.keys.justPressed.F12)
 			silhouettes.visible = !silhouettes.visible;
 
-		if(FlxG.keys.justPressed.F1 || (helpBg.visible && FlxG.keys.justPressed.ESCAPE))
+		if(FlxG.keys.justPressed.F1 #if mobile || touchPad.buttonF.justPressed #end || (helpBg.visible && FlxG.keys.justPressed.ESCAPE))
 		{
 			helpBg.visible = !helpBg.visible;
 			helpTexts.visible = helpBg.visible;
 		}
-		else if(FlxG.keys.justPressed.ESCAPE)
+		else if(FlxG.keys.justPressed.ESCAPE #if mobile || touchPad.buttonB.justPressed #end)
 		{
 			if(!_goToPlayState)
 			{
