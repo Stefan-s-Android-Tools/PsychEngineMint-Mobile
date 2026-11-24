@@ -1,6 +1,15 @@
 {
   "buttons": [
     {
+      "button": "buttonG",
+      "graphic": "g",
+      "x": 770,
+      "y": 2,
+      "width": 132,
+      "height": 125,
+      "color": "0xB1FC00"
+    },
+    {
       "button": "buttonX",
       "graphic": "x",
       "x": 896,

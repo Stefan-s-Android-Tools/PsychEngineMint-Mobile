@@ -150,6 +150,22 @@ class Paths
 	static public function setCurrentLevel(name:String)
 		currentLevel = name.toLowerCase();
 
+	/**
+	 * Whether `path` exists on disk or inside the packaged assets. Android ships the game data
+	 * inside the APK, so a plain `FileSystem.exists` is not enough on mobile.
+	 */
+	public static function exists(path:String):Bool
+	{
+		if (path == null || path.length == 0)
+			return false;
+
+		#if sys
+		if (FileSystem.exists(path))
+			return true;
+		#end
+		return OpenFlAssets.exists(path);
+	}
+
 	public static function getPath(file:String, ?type:AssetType = TEXT, ?parentfolder:String, ?modsAllowed:Bool = true):String
 	{
 		#if MODS_ALLOWED
@@ -178,7 +194,7 @@ class Paths
 				return levelPath;
 		}
 		
-		if (#if sys FileSystem.exists(file) #else OpenFlAssets.exists(file) #end) return file;
+		if (exists(file)) return file;
 		
 		return getSharedPath(file);
 	}
@@ -259,6 +275,9 @@ class Paths
 		return sound(key + FlxG.random.int(min, max), modsAllowed);
 
 	public static var currentTrackedAssets:Map<String, FlxGraphic> = [];
+
+	/** GPU texture size limit, filled in by `Main` from the Android GL context (0 = unknown). */
+	public static var maxTextureSize:Int = 0;
 	static public function image(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxGraphic
 	{
 		key = Language.getFileTranslation('images/$key') + '.png';
@@ -293,17 +312,33 @@ class Paths
 		if (bitmap == null)
 		{
 			var file:String = getPath(key, IMAGE, parentFolder, true);
+			var source:String = 'missing';
+
 			#if (MODS_ALLOWED && sys)
 			if (FileSystem.exists(file))
-				bitmap = BitmapData.fromFile(file);
-			else #end if (OpenFlAssets.exists(file, IMAGE))
+			{
+				source = 'external storage';
+				// an existing file can still fail to decode (corrupt or unsupported bit depth)
+				try bitmap = BitmapData.fromFile(file)
+				catch (e:Dynamic) trace('Could not decode image ${describeFile(file)}. ($e)');
+			}
+			#end
+
+			if (bitmap == null && OpenFlAssets.exists(file, IMAGE))
+			{
+				source = 'package';
 				bitmap = OpenFlAssets.getBitmapData(file);
+			}
 
 			if (bitmap == null)
 			{
-				trace('Bitmap not found: $file | key: $key');
+				trace('IMAGE NOT FOUND: key: $key | path: $file | source: $source');
 				return null;
 			}
+
+			// OpenGL ES 2.0 only guarantees 2048px, so an oversized mod spritemap can fail to upload
+			if (maxTextureSize > 0 && (bitmap.width > maxTextureSize || bitmap.height > maxTextureSize))
+				trace('IMAGE TOO LARGE for this GPU: $file (${bitmap.width}x${bitmap.height}, limit ${maxTextureSize}px)');
 		}
 
 		if (allowGPU) gpuCacheBitmap(bitmap);
@@ -317,14 +352,31 @@ class Paths
 		return graph;
 	}
 
+	/**
+	 * Readable form of a failed load: path, where it would come from and its size.
+	 */
+	public static function describeFile(path:String):String
+	{
+		#if sys
+		if (FileSystem.exists(path))
+		{
+			var size:String = 'unknown size';
+			try size = flixel.util.FlxStringUtil.formatBytes(FileSystem.stat(path).size)
+			catch (e:Dynamic) {}
+			return '"' + path + '" (external storage, ' + size + ')';
+		}
+		#end
+		return '"' + path + '" (not on disk, package lookup only)';
+	}
+
 	inline static public function getTextFromFile(key:String, ?ignoreMods:Bool = false):String
 	{
-		var path:String = getPath(key, TEXT, !ignoreMods);
+		var path:String = getPath(key, TEXT, null, !ignoreMods);
 		#if sys
-		return (FileSystem.exists(path)) ? File.getContent(path) : null;
-		#else
-		return (OpenFlAssets.exists(path, TEXT)) ? Assets.getText(path) : null;
+		if (FileSystem.exists(path))
+			return File.getContent(path);
 		#end
+		return (OpenFlAssets.exists(path, TEXT)) ? OpenFlAssets.getText(path) : null;
 	}
 
 	inline static public function font(key:String, embedded:Bool = true)
@@ -359,37 +411,31 @@ class Paths
 
 	static public function getAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
-		var useMod = false;
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
+		if (imageLoaded == null) return null;
 
-		var myXml:Dynamic = getPath('images/$key.xml', TEXT, parentFolder, true);
-		if(OpenFlAssets.exists(myXml) #if MODS_ALLOWED || (FileSystem.exists(myXml) && (useMod = true)) #end )
-		{
-			#if MODS_ALLOWED
-			return FlxAtlasFrames.fromSparrow(imageLoaded, (useMod ? getTextFromFile(myXml) : myXml));
-			#else
-			return FlxAtlasFrames.fromSparrow(imageLoaded, myXml);
-			#end
-		}
-		else
-		{
-			var myJson:Dynamic = getPath('images/$key.json', TEXT, parentFolder, true);
-			if(OpenFlAssets.exists(myJson) #if MODS_ALLOWED || (FileSystem.exists(myJson) && (useMod = true)) #end )
-			{
-				#if MODS_ALLOWED
-				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (useMod ? getTextFromFile(myJson) : myJson));
-				#else
-				return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, myJson);
-				#end
-			}
-		}
+		// The description has to follow the same path rules as the image: a mod that ships its own
+		// atlas must never be paired with the frame rectangles of a sibling or of the base game.
+		var text:String = readAtlasText(key, '.xml', parentFolder);
+		if (text != null) return FlxAtlasFrames.fromSparrow(imageLoaded, text);
+
+		text = readAtlasText(key, '.json', parentFolder);
+		if (text != null) return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, text);
+
 		return getPackerAtlas(key, parentFolder);
 	}
 	
 	static public function getMultiAtlas(keys:Array<String>, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		
-		var parentFrames:FlxAtlasFrames = Paths.getAtlas(keys[0].trim());
+		var parentFrames:FlxAtlasFrames = Paths.getAtlas(keys[0].trim(), parentFolder, allowGPU);
+		if (parentFrames == null) {
+			for (i in 1...keys.length) {
+				parentFrames = Paths.getAtlas(keys[i].trim(), parentFolder, allowGPU);
+				if (parentFrames != null) break;
+			}
+			if (parentFrames == null) return null;
+		}
 		if(keys.length > 1)
 		{
 			var original:FlxAtlasFrames = parentFrames;
@@ -408,46 +454,53 @@ class Paths
 	inline static public function getSparrowAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
-		#if (MODS_ALLOWED && sys)
-		var xmlExists:Bool = false;
+		if (imageLoaded == null) return null;
 
-		var xml:String = modsXml(key);
-		if(FileSystem.exists(xml)) xmlExists = true;
-		
-		return FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? getTextFromFile(xml) : getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder)));
-		#else
-		return FlxAtlasFrames.fromSparrow(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder));
-		#end
+		var text:String = getAtlasText(key, '.xml', parentFolder);
+		if (text == null) return new FlxAtlasFrames(imageLoaded);
+		return FlxAtlasFrames.fromSparrow(imageLoaded, text);
 	}
 
 	inline static public function getPackerAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
-		#if (MODS_ALLOWED && sys)
-		var txtExists:Bool = false;
-		
-		var txt:String = modsTxt(key);
-		if(FileSystem.exists(txt)) txtExists = true;
+		if (imageLoaded == null) return null;
 
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? getTextFromFile(txt) : getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder)));
-		#else
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder));
-		#end
+		var text:String = getAtlasText(key, '.txt', parentFolder);
+		if (text == null) return new FlxAtlasFrames(imageLoaded);
+		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, text);
 	}
 
 	inline static public function getAsepriteAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
-		#if (MODS_ALLOWED && sys)
-		var jsonExists:Bool = false;
+		if (imageLoaded == null) return null;
 
-		var json:String = modsImagesJson(key);
-		if(FileSystem.exists(json)) jsonExists = true;
+		var text:String = getAtlasText(key, '.json', parentFolder);
+		if (text == null) return new FlxAtlasFrames(imageLoaded);
+		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, text);
+	}
 
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (jsonExists ? getTextFromFile(json) : getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder)));
-		#else
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder));
-		#end
+	/**
+	 * Reads the description of an atlas from the same folder as its image. A mod that ships a
+	 * new image without its description would otherwise keep the frame rectangles of the base
+	 * game, which shows up as shifted or cut sprites.
+	 */
+	static function getAtlasText(key:String, extension:String, ?parentFolder:String):String
+	{
+		var text:String = readAtlasText(key, extension, parentFolder);
+		if (text == null)
+			trace('Missing atlas description "${getPath('images/$key' + extension, TEXT, parentFolder)}" for "$key".');
+		return text;
+	}
+
+	static function readAtlasText(key:String, extension:String, ?parentFolder:String):String
+	{
+		var path:String = getPath(Language.getFileTranslation('images/$key') + extension, TEXT, parentFolder);
+		var text:String = getTextFromFile(path);
+
+		if (text == null || StringTools.trim(text).length < 1) return null;
+		return text;
 	}
 
 	inline static public function formatToSongPath(path:String) {
@@ -465,13 +518,21 @@ class Paths
 		//trace('precaching sound: $file');
 		if(!currentTrackedSounds.exists(file))
 		{
+			var loaded:Sound = null;
 			#if (MODS_ALLOWED && sys)
 			if(FileSystem.exists(file))
-				currentTrackedSounds.set(file, Sound.fromFile(file));
-			#else
-			if(OpenFlAssets.exists(file, SOUND))
-				currentTrackedSounds.set(file, OpenFlAssets.getSound(file));
+			{
+				// an existing file can still fail to decode (corrupt, wrong codec or an
+				// unsupported sample rate); never let that take the state down with it
+				try loaded = Sound.fromFile(file)
+				catch (e:Dynamic) trace('Could not decode sound ${describeFile(file)}. ($e)');
+			}
 			#end
+			if(loaded == null && OpenFlAssets.exists(file, SOUND))
+				loaded = OpenFlAssets.getSound(file);
+
+			if(loaded != null)
+				currentTrackedSounds.set(file, loaded);
 			else if(beepOnNull)
 			{
 				trace('SOUND NOT FOUND: $key, PATH: $path');
@@ -540,17 +601,21 @@ class Paths
 	}
 	
 	public static function getAnimateAtlas(key:String, ?parentFolder:String, allowGPU:Bool = true):FlxAnimateFrames {
-		final path:String = animate(key);
-		
+		// mods and the game folder extracted on Android live outside the packaged manifest
+		backend.AnimateAssets.ensureDiskSupport();
+
+		final path:String = animate(key, parentFolder);
+
 		if (! #if (MODS_ALLOWED && sys) FileSystem #else OpenFlAssets #end.exists(path)) {
 			trace('ANIMATION JSON NOT FOUND: $key, PATH: $path');
-			
+
 			return null;
 		}
-		
+
 		final folder:String = path.substring(0, path.length - '/Animation.json'.length); // idk it trips if i dont do that
-		
-		var animateFrames:FlxAnimateFrames = FlxAnimateFrames.fromAnimate(folder, false, {cacheOnLoad: true});
+
+		// `spritemaps` and `metadata` have to stay null so the settings land on their own argument
+		var animateFrames:FlxAnimateFrames = FlxAnimateFrames.fromAnimate(folder, null, null, null, false, {cacheOnLoad: true});
 		
 		// trace('$path, $folder -> $animateFrames');
 		

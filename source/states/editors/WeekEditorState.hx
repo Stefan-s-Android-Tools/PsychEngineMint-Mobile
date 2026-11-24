@@ -98,6 +98,10 @@ class WeekEditorState extends MusicBeatState implements PsychUIEventHandler.Psyc
 
 		FlxG.mouse.visible = true;
 
+		#if mobile
+		addTouchPad('UP_DOWN', 'B');
+		#end
+
 		super.create();
 	}
 
@@ -396,7 +400,7 @@ class WeekEditorState extends MusicBeatState implements PsychUIEventHandler.Psyc
 		if(PsychUIInputText.focusOn == null)
 		{
 			ClientPrefs.toggleVolumeKeys(true);
-			if(FlxG.keys.justPressed.ESCAPE)
+			if(FlxG.keys.justPressed.ESCAPE || controls.BACK)
 			{
 				if(!unsavedProgress)
 				{
@@ -586,6 +590,9 @@ class WeekEditorFreeplayState extends MusicBeatState implements PsychUIEventHand
 
 		addEditorBox();
 		changeSelection();
+		#if mobile
+		addTouchPad('UP_DOWN', 'B');
+		#end
 		super.create();
 	}
 	
@@ -753,7 +760,7 @@ class WeekEditorFreeplayState extends MusicBeatState implements PsychUIEventHand
 		else
 		{
 			ClientPrefs.toggleVolumeKeys(true);
-			if(FlxG.keys.justPressed.ESCAPE) {
+			if(FlxG.keys.justPressed.ESCAPE || controls.BACK) {
 				if(!WeekEditorState.unsavedProgress)
 				{
 					MusicBeatState.switchState(new MainMenuState(true));

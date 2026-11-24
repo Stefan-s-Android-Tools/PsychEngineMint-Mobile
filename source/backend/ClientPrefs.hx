@@ -13,6 +13,7 @@ import states.TitleState;
 	public var middleScroll:Bool = false;
 	public var opponentStrums:Bool = true;
 	public var showFPS:Bool = true;
+	public var fpsRework:Bool = false;
 	public var flashing:Bool = true;
 	public var autoPause:Bool = true;
 	public var antialiasing:Bool = true;
@@ -85,9 +86,12 @@ import states.TitleState;
 	public var dynamicColors:Bool = false;
 	public var controlsAlpha:Float = FlxG.onMobile ? 0.6 : 0;
 	public var screensaver:Bool = false;
-	public var wideScreen:Bool = true;
+	public var wideScreen:Bool = false;
 	public var hitboxType:String = 'Gradient';
 	public var storageType:String = 'EXTERNAL';
+
+	// bumped when a stored default has to be migrated (see ClientPrefs.loadPrefs)
+	public var settingsVersion:Int = 0;
 }
 
 class ClientPrefs {
@@ -226,6 +230,16 @@ class ClientPrefs {
 		for (key in Reflect.fields(data))
 			if (key != 'gameplaySettings' && Reflect.hasField(FlxG.save.data, key))
 				Reflect.setField(data, key, Reflect.field(FlxG.save.data, key));
+
+		// v0 saves kept the old "stretch to fill" default, which deformed sprites and cameras.
+		if (data.settingsVersion < 1)
+		{
+			data.wideScreen = false;
+			data.settingsVersion = 1;
+			Reflect.setField(FlxG.save.data, 'wideScreen', false);
+			Reflect.setField(FlxG.save.data, 'settingsVersion', 1);
+			FlxG.save.flush();
+		}
 		
 		if(Main.fpsVar != null)
 			Main.fpsVar.visible = data.showFPS;
@@ -239,7 +253,12 @@ class ClientPrefs {
 		}
 		#end
 
-		if(data.framerate > FlxG.drawFramerate)
+		if (data.fpsRework)
+		{
+			// the window drives the frame pacing, `FPSCounter` keeps it in sync with the real FPS
+			FlxG.stage.window.frameRate = data.framerate;
+		}
+		else if(data.framerate > FlxG.drawFramerate)
 		{
 			FlxG.updateFramerate = data.framerate;
 			FlxG.drawFramerate = data.framerate;

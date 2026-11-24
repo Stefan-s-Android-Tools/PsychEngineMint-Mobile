@@ -52,6 +52,12 @@ class TouchPad extends MobileInputManager implements IMobileControls
 	public var instance:MobileInputManager;
 
 	/**
+	 * Touch points that were already down when the pad was created. Every button ignores
+	 * them so the release that closed the previous state cannot press the new pad.
+	 */
+	var heldTouches:Array<Int> = [];
+
+	/**
          * Create a gamepad.
          *
          * @param   DPadMode     The D-Pad mode. `LEFT_FULL` for example.
@@ -60,6 +66,10 @@ class TouchPad extends MobileInputManager implements IMobileControls
 	public function new(DPad:String, Action:String, ?Extra:ExtraActions = NONE)
 	{
 		super();
+
+		for (touch in FlxG.touches.list)
+			if (touch.pressed)
+				heldTouches.push(touch.touchPointID);
 
 		if (DPad != "NONE")
 		{
@@ -184,6 +194,7 @@ class TouchPad extends MobileInputManager implements IMobileControls
 		button.tag = Graphic.toUpperCase();
 		button.color = Color;
 		button.parentAlpha = button.alpha;
+		button.ignoredTouches = heldTouches;
 		return button;
 	}
 

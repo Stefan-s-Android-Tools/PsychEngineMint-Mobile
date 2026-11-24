@@ -3,6 +3,7 @@ package mobile.objects;
 import flixel.input.FlxInput;
 import flixel.input.FlxPointer;
 import flixel.input.IFlxInput;
+import flixel.input.touch.FlxTouch;
 import flixel.system.FlxAssets.FlxShader;
 import flixel.util.FlxDestroyUtil;
 import flixel.util.FlxDestroyUtil.IFlxDestroyable;
@@ -97,9 +98,16 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 	public var multiTouch:Bool = false;
 
 	/**
-         * Maximum distance a pointer can move to still trigger event handlers.
-         */
+	 * Maximum distance a pointer can move to still trigger event handlers.
+	 */
 	public var maxInputMovement:Float = Math.POSITIVE_INFINITY;
+
+	/**
+	 * Touch points that were already down when this button appeared, for example the finger
+	 * that released the button closing the previous menu. They are ignored until released,
+	 * otherwise that same release would press the button of the newly opened menu.
+	 */
+	public var ignoredTouches:Array<Int>;
 
 	/**
          * The properties of this button's `onUp` event (callback function, sound).
@@ -276,14 +284,26 @@ class TypedTouchButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 			#if mac
 			var button = FlxMouseButton.getByID(FlxMouseButtonID.LEFT);
 			if (checkInput(FlxG.mouse, button, button.justPressedPosition, camera))
+				overlap = true;
 			#else
 			for (touch in FlxG.touches.list)
-				if (checkInput(touch, touch, touch.justPressedPosition, camera))
+				if (!isIgnoredTouch(touch) && checkInput(touch, touch, touch.justPressedPosition, camera))
+					overlap = true;
 			#end
-			overlap = true;
 		}
 
 		return overlap;
+	}
+
+	function isIgnoredTouch(touch:FlxTouch):Bool
+	{
+		if (ignoredTouches == null || ignoredTouches.length < 1)
+			return false;
+
+		if (!touch.pressed)
+			ignoredTouches.remove(touch.touchPointID);
+
+		return touch.pressed && ignoredTouches.contains(touch.touchPointID);
 	}
 
 	function checkInput(pointer:FlxPointer, input:IFlxInput, justPressedPosition:FlxPoint, camera:FlxCamera):Bool

@@ -177,6 +177,11 @@ class EditorPlayState extends ScriptedSubState
 
 		cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
 
+		#if mobile
+		// the chart editor pad has no cancel button, playtest needs its own
+		addTouchPad('NONE', 'B');
+		#end
+
 		super.create();
 	}
 

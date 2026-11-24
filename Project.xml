@@ -22,6 +22,8 @@
 	<define name="TRANSLATIONS_ALLOWED" />
 	<define name="IRIS_DEBUG" />
 	<define name="EMIMOD"/>
+	<!-- `assets/base_game` ships the weeks, charts, characters and stages this build plays -->
+	<define name="BASE_GAME_FILES" />
 
 	<define name="INCLUDE_ALL_CLASSES" /> <!-- Removes DCE and compiles (most) classes, for use in scripting -->
 	<define name="MULTITHREADED_LOADING" /> <!-- UNCOMMENTING THIS LINE WILL ENABLE MULTITHREADED LOADING, WHICH IMPROVES LOADING TIMES, BUT APPARENTLY CAN FREEZE THE GAME ON SONG LOAD IN OLDER PCs? -->
@@ -38,9 +40,20 @@
 	<window width="1280" height="720" fps="60" background="#000000" hardware="true" vsync="false" allow-high-dpi="true" />
 	<window orientation="landscape" fullscreen="true" width="0" height="0" resizable="false" />
 
+	<!--
+	  The same `hardware="true"` window gives OpenGL ES on Android and desktop OpenGL on PC:
+	  lime builds its GL backend against GLES2/gl2.h and links libGLESv2/libEGL for android
+	  targets only, and OpenFL compiles the shaders as GLSL ES 100 there. There is no
+	  Project.xml attribute to pick a GL version, so nothing else has to be set for Android.
+	  `Main.logGraphicsBackend()` logs the context and the texture limit once the window renders.
+	-->
+
 	<!-- ____________________________ Android Settings __________________________ -->
 
 	<java path="source" />
+	<!-- Queues the system back button/gesture for the game instead of closing the activity -->
+	<java path="java" />
+	<config:android extension="org.haxe.extension.PsychBackButton" />
 
 	<config:android minimum-sdk-version="24" target-sdk-version="36" build-tools-version="36.0.0" />
 
@@ -118,7 +131,15 @@
 	</section>
 
 	<section if="MODS_ALLOWED">
-		<assets path='example_mods' rename='mods' embed='false' type='template' />
+		<!-- On desktop the mod template is copied next to the executable. Android has no
+		     writable folder there, so the APK carries it and StorageUtil extracts it on
+		     first launch without touching mods made by the player. -->
+		<assets path='example_mods' rename='mods' embed='false' type='template' unless="android" />
+		<assets path='list.txt' rename='modsList.txt' unless="android" />
+	</section>
+
+	<section if="MODS_ALLOWED android">
+		<assets path='example_mods' rename='mods' />
 		<assets path='list.txt' rename='modsList.txt' />
 	</section>
 

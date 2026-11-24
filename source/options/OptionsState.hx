@@ -16,6 +16,7 @@ class OptionsState extends ScriptedState
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
 		];
 	private static var curSelected:Int = 0;
+	var exiting:Bool = false;
 	public static var onPlayState:Bool = false;
 	
 	var optionFunctions:Map<String, Void -> Void> = [];
@@ -30,29 +31,36 @@ class OptionsState extends ScriptedState
 		}
 	}
 
+	function openOption(sub:Dynamic):Void {
+		#if mobile
+		removeTouchPad();
+		#end
+		persistentUpdate = false;
+		openSubState(sub);
+	}
+
 	var selectorLeft:Alphabet;
 	var selectorRight:Alphabet;
 
 	override function create() {
-		optionFunctions['Note Colors'] = () -> openSubState(new options.NotesColorSubState());
+		optionFunctions['Note Colors'] = () -> openOption(new options.NotesColorSubState());
 		optionFunctions['Controls'] = () -> {
 			#if mobile
 			if (controls.mobileC) {
-				persistentUpdate = false;
-				openSubState(new mobile.substates.MobileControlSelectSubState());
+				openOption(new mobile.substates.MobileControlSelectSubState());
 				return;
 			}
 			#end
-			openSubState(new options.ControlsSubState());
+			openOption(new options.ControlsSubState());
 		};
 		#if mobile
-		optionFunctions['Mobile Options'] = () -> openSubState(new mobile.options.MobileOptionsSubState());
+		optionFunctions['Mobile Options'] = () -> openOption(new mobile.options.MobileOptionsSubState());
 		#end
-		optionFunctions['Graphics'] = () -> openSubState(new options.GraphicsSettingsSubState());
-		optionFunctions['Visuals'] = () -> openSubState(new options.VisualsSettingsSubState());
-		optionFunctions['Gameplay'] = () -> openSubState(new options.GameplaySettingsSubState());
+		optionFunctions['Graphics'] = () -> openOption(new options.GraphicsSettingsSubState());
+		optionFunctions['Visuals'] = () -> openOption(new options.VisualsSettingsSubState());
+		optionFunctions['Gameplay'] = () -> openOption(new options.GameplaySettingsSubState());
 		optionFunctions['Delay and Combo'] = () -> MusicBeatState.switchState(new options.NoteOffsetState());
-		optionFunctions['Language'] = () -> openSubState(new options.LanguageSubState());
+		optionFunctions['Language'] = () -> openOption(new options.LanguageSubState());
 		
 		rpcDetails = 'Options Menu';
 		preCreate();
@@ -94,6 +102,11 @@ class OptionsState extends ScriptedState
 	{
 		super.closeSubState();
 		ClientPrefs.saveSettings();
+		#if mobile
+		removeTouchPad();
+		addTouchPad('UP_DOWN', 'A_B');
+		#end
+		persistentUpdate = true;
 		#if DISCORD_ALLOWED
 		DiscordClient.changePresence("Options Menu", null);
 		#end
@@ -101,29 +114,37 @@ class OptionsState extends ScriptedState
 
 	override function update(elapsed:Float) {
 		preUpdate(elapsed);
-		
-		super.update(elapsed);
-		
-		if (controls.UI_UP_P)
-			changeSelection(-1);
-		if (controls.UI_DOWN_P)
-			changeSelection(1);
 
-		if (controls.BACK) {
-			FlxG.sound.play(Paths.sound('cancelMenu'));
-			if(onPlayState) {
-				StageData.loadDirectory(PlayState.SONG);
-				LoadingState.loadAndSwitchState(new PlayState());
-				FlxG.sound.music.volume = 0;
+		// A sub menu that closes during `super.update()` already handled its own BACK press, but
+		// the press is still `justPressed` when this menu reads it afterwards, which sent the
+		// player straight back to the main menu. Ignore input while a sub menu is (or was) open.
+		final hadSubState:Bool = subState != null;
+
+		super.update(elapsed);
+
+		if (!exiting && !hadSubState && subState == null) {
+			if (controls.UI_UP_P)
+				changeSelection(-1);
+			if (controls.UI_DOWN_P)
+				changeSelection(1);
+
+			if (controls.BACK) {
+				exiting = true;
+				FlxG.sound.play(Paths.sound('cancelMenu'));
+				if(onPlayState) {
+					StageData.loadDirectory(PlayState.SONG);
+					LoadingState.loadAndSwitchState(new PlayState());
+					FlxG.sound.music.volume = 0;
+				}
+				else MusicBeatState.switchState(new MainMenuState());
+			} else if (controls.ACCEPT) {
+				accept(options[curSelected], curSelected);
 			}
-			else MusicBeatState.switchState(new MainMenuState());
-		} else if (controls.ACCEPT) {
-			accept(options[curSelected], curSelected);
 		}
-		
+
 		postUpdate(elapsed);
 	}
-	
+
 	function changeSelection(change:Int = 0) {
 		var next:Int = FlxMath.wrap(curSelected + change, 0, options.length - 1);
 		

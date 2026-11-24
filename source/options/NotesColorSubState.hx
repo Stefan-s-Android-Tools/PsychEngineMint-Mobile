@@ -101,7 +101,7 @@ class NotesColorSubState extends ScriptedSubState
 		colorGradientSelector.offset.y = 5;
 		add(colorGradientSelector);
 
-		colorPalette = new FlxSprite(0, 580).loadGraphic(Paths.image('noteColorMenu/palette', false));
+		colorPalette = new FlxSprite(0, 580).loadGraphic(Paths.image('noteColorMenu/palette', null, false));
 		colorPalette.scale.set(20, 20);
 		colorPalette.updateHitbox();
 		colorPalette.x = bg.x + (bg.width - colorPalette.width) * .5;
@@ -158,6 +158,13 @@ class NotesColorSubState extends ScriptedSubState
 		FlxG.mouse.visible = !controls.controllerMode;
 		controllerPointer.visible = controls.controllerMode;
 		_lastControllerMode = controls.controllerMode;
+
+		#if mobile
+		addTouchPad('NONE', 'B_C');
+		touchPad.buttonB.x = FlxG.width - 132;
+		touchPad.buttonC.x = 0;
+		touchPad.buttonC.y = FlxG.height - 135;
+		#end
 	}
 
 	function updateTip()

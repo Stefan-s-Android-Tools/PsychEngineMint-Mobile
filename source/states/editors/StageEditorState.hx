@@ -110,6 +110,11 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		FlxG.mouse.visible = true;
 		animationEditor = new StageEditorAnimationSubstate();
 
+		#if mobile
+		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
+		addTouchPadCamera();
+		#end
+
 		super.create();
 	}
 
@@ -1343,7 +1348,7 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 		if(PsychUIInputText.focusOn != null) return;
 
-		if(FlxG.keys.justPressed.ESCAPE)
+		if(FlxG.keys.justPressed.ESCAPE #if mobile || touchPad.buttonB.justPressed #end)
 		{
 			if(!unsavedProgress)
 			{
@@ -1354,14 +1359,14 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			return;
 		}
 
-		if(FlxG.keys.justPressed.W)
+		if(FlxG.keys.justPressed.W #if mobile || touchPad.buttonV.justPressed #end)
 		{
 			spriteListRadioGroup.checked = FlxMath.wrap(spriteListRadioGroup.checked - 1, 0, spriteListRadioGroup.labels.length-1);
 			trace(spriteListRadioGroup.checked);
 			checkUIOnObject();
 			updateSelectedUI();
 		}
-		else if(FlxG.keys.justPressed.S)
+		else if(FlxG.keys.justPressed.S #if mobile || touchPad.buttonD.justPressed #end)
 		{
 			spriteListRadioGroup.checked = FlxMath.wrap(spriteListRadioGroup.checked + 1, 0, spriteListRadioGroup.labels.length-1);
 			trace(spriteListRadioGroup.checked);
@@ -1369,16 +1374,16 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			updateSelectedUI();
 		}
 
-		if(FlxG.keys.justPressed.F1 || (helpBg.visible && FlxG.keys.justPressed.ESCAPE))
+		if(FlxG.keys.justPressed.F1 #if mobile || touchPad.buttonF.justPressed #end || (helpBg.visible && FlxG.keys.justPressed.ESCAPE))
 		{
 			helpBg.visible = !helpBg.visible;
 			helpTexts.visible = helpBg.visible;
 		}
 
 		#if FLX_DEBUG
-		if(FlxG.keys.justPressed.F3)
+		if(FlxG.keys.justPressed.F3 #if mobile || (touchPad.buttonS.justPressed && !touchPad.buttonG.pressed) #end)
 		#else
-		if(FlxG.keys.justPressed.F2)
+		if(FlxG.keys.justPressed.F2 #if mobile || (touchPad.buttonS.justPressed && !touchPad.buttonG.pressed) #end)
 		#end
 		{
 			UI_box.visible = !UI_box.visible;
@@ -1393,22 +1398,23 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 			spriteListRadioGroup.updateRadioItems();
 		}
 		
-		if(FlxG.keys.justPressed.F12)
+		if(FlxG.keys.justPressed.F12 #if mobile || (touchPad.buttonS.justPressed && touchPad.buttonG.pressed) #end)
 			showSelectionQuad = !showSelectionQuad;
 		
 		var shiftMult:Float = 1;
 		var ctrlMult:Float = 1;
-		if(FlxG.keys.pressed.SHIFT) shiftMult = 4;
+		if(FlxG.keys.pressed.SHIFT #if mobile || touchPad.buttonC.pressed #end) shiftMult = 4;
 		if(FlxG.keys.pressed.CONTROL) ctrlMult = 0.25;
 
 		// CAMERA CONTROLS
 		var camX:Float = 0;
 		var camY:Float = 0;
 		var camMove:Float = elapsed * 500 * shiftMult * ctrlMult;
-		if (FlxG.keys.pressed.J) camX -= camMove;
-		if (FlxG.keys.pressed.K) camY += camMove;
-		if (FlxG.keys.pressed.L) camX += camMove;
-		if (FlxG.keys.pressed.I) camY -= camMove;
+		var padPan:Bool = #if mobile touchPad.buttonG.pressed #else false #end;
+		if (FlxG.keys.pressed.J || (padPan && touchPad.buttonLeft.pressed)) camX -= camMove;
+		if (FlxG.keys.pressed.K || (padPan && touchPad.buttonDown.pressed)) camY += camMove;
+		if (FlxG.keys.pressed.L || (padPan && touchPad.buttonRight.pressed)) camX += camMove;
+		if (FlxG.keys.pressed.I || (padPan && touchPad.buttonUp.pressed)) camY -= camMove;
 
 		if(camX != 0 || camY != 0)
 		{
@@ -1419,11 +1425,11 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 		}
 
 		var lastZoom = FlxG.camera.zoom;
-		if(FlxG.keys.justPressed.R && !FlxG.keys.pressed.CONTROL)
+		if(FlxG.keys.justPressed.R && !FlxG.keys.pressed.CONTROL #if mobile || touchPad.buttonZ.justPressed #end)
 			FlxG.camera.zoom = stageJson.defaultZoom;
-		else if (FlxG.keys.pressed.E && FlxG.camera.zoom < maxZoom)
+		else if ((FlxG.keys.pressed.E #if mobile || touchPad.buttonX.pressed #end) && FlxG.camera.zoom < maxZoom)
 			FlxG.camera.zoom = Math.min(maxZoom, FlxG.camera.zoom + elapsed * FlxG.camera.zoom * shiftMult * ctrlMult);
-		else if (FlxG.keys.pressed.Q && FlxG.camera.zoom > minZoom)
+		else if ((FlxG.keys.pressed.Q #if mobile || touchPad.buttonY.pressed #end) && FlxG.camera.zoom > minZoom)
 			FlxG.camera.zoom = Math.max(minZoom, FlxG.camera.zoom - elapsed * FlxG.camera.zoom * shiftMult * ctrlMult);
 		
 		// SPRITE X/Y
@@ -1434,10 +1440,17 @@ class StageEditorState extends MusicBeatState implements PsychUIEventHandler.Psy
 
 		var moveX:Float = 0;
 		var moveY:Float = 0;
+		#if mobile
+		if (!touchPad.buttonG.pressed && touchPad.buttonLeft.justPressed) moveX -= 5 * shiftMult * ctrlMult;
+		if (!touchPad.buttonG.pressed && touchPad.buttonRight.justPressed) moveX += 5 * shiftMult * ctrlMult;
+		if (!touchPad.buttonG.pressed && touchPad.buttonUp.justPressed) moveY -= 5 * shiftMult * ctrlMult;
+		if (!touchPad.buttonG.pressed && touchPad.buttonDown.justPressed) moveY += 5 * shiftMult * ctrlMult;
+		#else
 		if (FlxG.keys.justPressed.LEFT) moveX -= 5 * shiftMult * ctrlMult;
 		if (FlxG.keys.justPressed.RIGHT) moveX += 5 * shiftMult * ctrlMult;
 		if (FlxG.keys.justPressed.UP) moveY -= 5 * shiftMult * ctrlMult;
 		if (FlxG.keys.justPressed.DOWN) moveY += 5 * shiftMult * ctrlMult;
+		#end
 
 		if(FlxG.mouse.pressedRight && (FlxG.mouse.deltaViewX != 0 || FlxG.mouse.deltaViewY != 0))
 		{
@@ -2004,6 +2017,8 @@ class StageEditorAnimationSubstate extends MusicBeatSubstate {
 		add(grid);
 		
 		animsTxtGroup = new FlxTypedGroup<FlxText>();
+		addTouchPad('LEFT_FULL', 'CHARACTER_EDITOR');
+		addTouchPadCamera();
 		animsTxtGroup.cameras = [camHUD];
 		add(animsTxtGroup);
 		
@@ -2271,9 +2286,9 @@ class StageEditorAnimationSubstate extends MusicBeatSubstate {
 		if(target.animations.length > 1)
 		{
 			var changedAnim:Bool = false;
-			if(FlxG.keys.justPressed.W && (changedAnim = true)) curAnim--;
-			else if(FlxG.keys.justPressed.S && (changedAnim = true)) curAnim++;
-			else if(FlxG.keys.justPressed.SPACE) changedAnim = true;
+			if((FlxG.keys.justPressed.W #if mobile || touchPad.buttonV.justPressed #end) && (changedAnim = true)) curAnim--;
+			else if((FlxG.keys.justPressed.S #if mobile || touchPad.buttonD.justPressed #end) && (changedAnim = true)) curAnim++;
+			else if(FlxG.keys.justPressed.SPACE #if mobile || touchPad.buttonA.justPressed #end) changedAnim = true;
 
 			if(changedAnim)
 			{
@@ -2286,7 +2301,7 @@ class StageEditorAnimationSubstate extends MusicBeatSubstate {
 		var shiftMult:Float = 1;
 		var ctrlMult:Float = 1;
 		var shiftMultBig:Float = 1;
-		if(FlxG.keys.pressed.SHIFT)
+		if(FlxG.keys.pressed.SHIFT #if mobile || touchPad.buttonC.pressed #end)
 		{
 			shiftMult = 4;
 			shiftMultBig = 10;
@@ -2299,8 +2314,13 @@ class StageEditorAnimationSubstate extends MusicBeatSubstate {
 			var spr:ModchartSprite = cast (target.sprite, ModchartSprite);
 			var anim:String = spr.animation.curAnim.name;
 			var changedOffset = false;
+			#if mobile
+			var moveKeysP = !touchPad.buttonG.pressed ? [touchPad.buttonLeft.justPressed, touchPad.buttonRight.justPressed, touchPad.buttonUp.justPressed, touchPad.buttonDown.justPressed] : [false, false, false, false];
+			var moveKeys = !touchPad.buttonG.pressed ? [touchPad.buttonLeft.pressed, touchPad.buttonRight.pressed, touchPad.buttonUp.pressed, touchPad.buttonDown.pressed] : [false, false, false, false];
+			#else
 			var moveKeysP = [FlxG.keys.justPressed.LEFT, FlxG.keys.justPressed.RIGHT, FlxG.keys.justPressed.UP, FlxG.keys.justPressed.DOWN];
 			var moveKeys = [FlxG.keys.pressed.LEFT, FlxG.keys.pressed.RIGHT, FlxG.keys.pressed.UP, FlxG.keys.pressed.DOWN];
+			#end
 			if(moveKeysP.contains(true))
 			{
 				if(spr.animOffsets.get(anim) != null)
@@ -2368,10 +2388,11 @@ class StageEditorAnimationSubstate extends MusicBeatSubstate {
 		var camX:Float = 0;
 		var camY:Float = 0;
 		var camMove:Float = elapsed * 500 * shiftMult * ctrlMult;
-		if (FlxG.keys.pressed.J) camX -= camMove;
-		if (FlxG.keys.pressed.K) camY += camMove;
-		if (FlxG.keys.pressed.L) camX += camMove;
-		if (FlxG.keys.pressed.I) camY -= camMove;
+		var padPan:Bool = #if mobile touchPad.buttonG.pressed #else false #end;
+		if (FlxG.keys.pressed.J || (padPan && touchPad.buttonLeft.pressed)) camX -= camMove;
+		if (FlxG.keys.pressed.K || (padPan && touchPad.buttonDown.pressed)) camY += camMove;
+		if (FlxG.keys.pressed.L || (padPan && touchPad.buttonRight.pressed)) camX += camMove;
+		if (FlxG.keys.pressed.I || (padPan && touchPad.buttonUp.pressed)) camY -= camMove;
 
 		if(camX != 0 || camY != 0)
 		{
@@ -2380,14 +2401,14 @@ class StageEditorAnimationSubstate extends MusicBeatSubstate {
 		}
 
 		var lastZoom = FlxG.camera.zoom;
-		if(FlxG.keys.justPressed.R && !FlxG.keys.pressed.CONTROL)
+		if(FlxG.keys.justPressed.R && !FlxG.keys.pressed.CONTROL #if mobile || touchPad.buttonZ.justPressed #end)
 			FlxG.camera.zoom = 0.5;
-		else if (FlxG.keys.pressed.E && FlxG.camera.zoom < maxZoom)
+		else if ((FlxG.keys.pressed.E #if mobile || touchPad.buttonX.pressed #end) && FlxG.camera.zoom < maxZoom)
 			FlxG.camera.zoom = Math.min(maxZoom, FlxG.camera.zoom + elapsed * FlxG.camera.zoom * shiftMult * ctrlMult);
-		else if (FlxG.keys.pressed.Q && FlxG.camera.zoom > minZoom)
+		else if ((FlxG.keys.pressed.Q #if mobile || touchPad.buttonY.pressed #end) && FlxG.camera.zoom > minZoom)
 			FlxG.camera.zoom = Math.max(minZoom, FlxG.camera.zoom - elapsed * FlxG.camera.zoom * shiftMult * ctrlMult);
 
-		if(FlxG.keys.justPressed.ESCAPE)
+		if(FlxG.keys.justPressed.ESCAPE #if mobile || touchPad.buttonB.justPressed #end)
 		{
 			persistentDraw = true;
 			close();

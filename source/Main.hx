@@ -91,6 +91,8 @@ class Main extends Sprite
 		mobile.backend.StorageUtil.createDirectories(storageDir);
 		if (!mobile.backend.StorageUtil.isWritable(storageDir))
 		{
+			// ask for shared storage access before giving up on the external folder
+			mobile.backend.StorageUtil.requestPermissions();
 			trace('Cannot write to "$storageDir", falling back to "$fallbackDir"');
 			storageDir = fallbackDir;
 		}
@@ -101,6 +103,7 @@ class Main extends Sprite
 		}
 
 		Sys.setCwd(storageDir);
+		mobile.backend.StorageUtil.setupGameDirectory(Path.addTrailingSlash(storageDir));
 		#elseif ios
 		Sys.setCwd(lime.system.System.applicationStorageDirectory);
 		#end
@@ -139,7 +142,6 @@ class Main extends Sprite
 		traces = new ScriptTraceDisplay();
 		addChild(traces);
 		
-		#if !mobile
 		fpsVar = new FPSCounter(12, 4, 0xffffff);
 		addChild(fpsVar);
 		Lib.current.stage.align = "tl";
@@ -147,7 +149,6 @@ class Main extends Sprite
 		if(fpsVar != null) {
 			fpsVar.visible = ClientPrefs.data.showFPS;
 		}
-		#end
 		
 		#if (linux || mac) // fix the app icon not showing up on the Linux Panel / Mac Dock
 		var icon = Image.fromFile("icon.png");
@@ -173,8 +174,20 @@ class Main extends Sprite
 		FlxG.scaleMode = new MobileScaleMode();
 		#end
 
+		updateFPSPosition();
+
+		#if android
+		// the system back button/gesture is queued by the Java extension and has to be picked
+		// up once per frame, before any state reads `Controls`
+		FlxG.signals.preUpdate.add(mobile.backend.SystemBack.poll);
+
+		// the GL context only exists once the window renders, so the report waits for it
+		Lib.current.stage.window.onRender.add(logGraphicsBackend);
+		#end
+
 		// shader coords fix
 		FlxG.signals.gameResized.add((w:Int, h:Int) -> {
+			updateFPSPosition();
 		     if (FlxG.cameras != null) {
 			   for (cam in FlxG.cameras.list) {
 				if (cam != null && cam.filters != null)
@@ -187,6 +200,52 @@ class Main extends Sprite
 		});
 	}
 	
+	/**
+	 * Scales and clamps the FPS counter to the game view. Android renders the game in
+	 * physical pixels, so the counter has to follow the current scale factor to stay
+	 * readable and inside the screen on every resolution and density.
+	 */
+	public static function updateFPSPosition():Void
+	{
+		if (fpsVar == null) return;
+
+		final scale:Float = (FlxG.scaleMode != null ? FlxG.scaleMode.scale.x : 1);
+		fpsVar.positionFPS(12, 4, scale);
+	}
+
+	#if android
+	static var graphicsLogged:Bool = false;
+
+	/**
+	 * Android renders through OpenGL ES: lime compiles its GL backend against `GLES2/gl2.h` and
+	 * links `libGLESv2`/`libEGL`, so `hardware="true"` always yields an ES context (2.0, or 3.x on
+	 * newer devices) and OpenFL compiles the shaders as GLSL ES. There is no Project.xml switch for
+	 * it, so log what the device actually handed us, together with the texture size limit that
+	 * oversized mod spritemaps run into.
+	 */
+	static function logGraphicsBackend(?context:lime.graphics.RenderContext):Void
+	{
+		Lib.current.stage.window.onRender.remove(logGraphicsBackend);
+		if (graphicsLogged) return;
+		graphicsLogged = true;
+
+		try
+		{
+			final version:String = lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.VERSION);
+			final renderer:String = lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.RENDERER);
+			final maxTexture:Int = lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.MAX_TEXTURE_SIZE);
+
+			trace('GRAPHICS: $version | $renderer | max texture size: ${maxTexture}px');
+			if (version == null || version.indexOf('OpenGL ES') < 0)
+				trace('GRAPHICS: expected an OpenGL ES context on Android but got "$version"; rendering may misbehave.');
+
+			backend.Paths.maxTextureSize = maxTexture;
+		}
+		catch (e:Dynamic) trace('GRAPHICS: could not read the GL context. ($e)');
+	}
+	#end
+
+
 	static function resetSpriteCache(sprite:Sprite):Void {
 		@:privateAccess {
 		        sprite.__cacheBitmap = null;

@@ -171,7 +171,9 @@ class PauseSubState extends ScriptedSubState
 
 		super.update(elapsed);
 
-		if(controls.BACK)
+		// same grace period as ACCEPT: a duplicate/stale back event right after opening the
+		// menu must not close it again
+		if(controls.BACK && cantUnpause <= 0)
 		{
 			close();
 			return;

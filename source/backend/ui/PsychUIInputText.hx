@@ -4,6 +4,7 @@ import flixel.FlxObject;
 import flixel.input.keyboard.FlxKey;
 import flixel.util.FlxDestroyUtil;
 import flash.events.KeyboardEvent;
+import openfl.events.TextEvent;
 import lime.system.Clipboard;
 
 enum abstract AccentCode(Int) from Int from UInt to Int to UInt
@@ -363,6 +364,12 @@ class PsychUIInputText extends FlxSpriteGroup
 				onPressEnter(e);
 
 			default:
+				#if mobile
+				// while the on-screen keyboard is up the characters arrive as `TextEvent.TEXT_INPUT`
+				// (see `onSoftKeyboardInput`), typing them here as well would duplicate them
+				if (FlxG.stage.window.textInputEnabled) return;
+				#end
+
 				if(charCode < 1)
 					if((charCode = getAccentCharCode(_nextAccent)) < 1)
 						return;
@@ -381,6 +388,16 @@ class PsychUIInputText extends FlxSpriteGroup
 	public var unfocus:Void->Void;
 	public static function set_focusOn(v:PsychUIInputText)
 	{
+		#if mobile
+		if (focusOn != v)
+		{
+			if (focusOn != null) focusOn.unbindSoftKeyboard();
+			if (v != null) v.bindSoftKeyboard();
+			// this is what opens (and closes) the on-screen keyboard on Android and iOS
+			FlxG.stage.window.textInputEnabled = (v != null);
+		}
+		#end
+
 		if (focusOn != v && focusOn != null && focusOn.exists) {
 			var prev = focusOn;
 			focusOn = v;
@@ -390,6 +407,48 @@ class PsychUIInputText extends FlxSpriteGroup
 		}
 		return focusOn = v;
 	}
+
+	#if mobile
+	private var softKeyboardBound:Bool = false;
+
+	/**
+	 * Mobile keyboards send whole strings instead of key codes, so the focused field listens
+	 * for `TextEvent.TEXT_INPUT` to receive what the player typed.
+	 */
+	private function onSoftKeyboardInput(e:TextEvent):Void
+	{
+		if (focusOn != this || e.text == null) return;
+
+		for (i in 0...e.text.length)
+		{
+			final code:Int = e.text.charCodeAt(i);
+			switch (code)
+			{
+				case 13: // IME "done" key
+					onPressEnter(new KeyboardEvent(KeyboardEvent.KEY_DOWN, true, false, 13, 13));
+				case 8: // some IMEs report their backspace as text
+					onKeyDown(new KeyboardEvent(KeyboardEvent.KEY_DOWN, true, false, 8, 8));
+				default:
+					if (code >= 32) _typeLetter(code);
+			}
+		}
+		e.preventDefault();
+	}
+
+	private function bindSoftKeyboard():Void
+	{
+		if (softKeyboardBound || FlxG.stage == null) return;
+		softKeyboardBound = true;
+		FlxG.stage.addEventListener(TextEvent.TEXT_INPUT, onSoftKeyboardInput);
+	}
+
+	private function unbindSoftKeyboard():Void
+	{
+		if (!softKeyboardBound) return;
+		softKeyboardBound = false;
+		FlxG.stage.removeEventListener(TextEvent.TEXT_INPUT, onSoftKeyboardInput);
+	}
+	#end
 
 	override function update(elapsed:Float)
 	{
