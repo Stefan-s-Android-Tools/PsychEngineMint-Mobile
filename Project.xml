@@ -40,6 +40,14 @@
 	<window width="1280" height="720" fps="60" background="#000000" hardware="true" vsync="false" allow-high-dpi="true" />
 	<window orientation="landscape" fullscreen="true" width="0" height="0" resizable="false" />
 
+	<!--
+	  The same `hardware="true"` window gives OpenGL ES on Android and desktop OpenGL on PC:
+	  lime builds its GL backend against GLES2/gl2.h and links libGLESv2/libEGL for android
+	  targets only, and OpenFL compiles the shaders as GLSL ES 100 there. There is no
+	  Project.xml attribute to pick a GL version, so nothing else has to be set for Android.
+	  `Main.logGraphicsBackend()` logs the context and the texture limit once the window renders.
+	-->
+
 	<!-- ____________________________ Android Settings __________________________ -->
 
 	<java path="source" />

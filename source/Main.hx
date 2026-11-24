@@ -180,6 +180,9 @@ class Main extends Sprite
 		// the system back button/gesture is queued by the Java extension and has to be picked
 		// up once per frame, before any state reads `Controls`
 		FlxG.signals.preUpdate.add(mobile.backend.SystemBack.poll);
+
+		// the GL context only exists once the window renders, so the report waits for it
+		Lib.current.stage.window.onRender.add(logGraphicsBackend);
 		#end
 
 		// shader coords fix
@@ -209,6 +212,39 @@ class Main extends Sprite
 		final scale:Float = (FlxG.scaleMode != null ? FlxG.scaleMode.scale.x : 1);
 		fpsVar.positionFPS(12, 4, scale);
 	}
+
+	#if android
+	static var graphicsLogged:Bool = false;
+
+	/**
+	 * Android renders through OpenGL ES: lime compiles its GL backend against `GLES2/gl2.h` and
+	 * links `libGLESv2`/`libEGL`, so `hardware="true"` always yields an ES context (2.0, or 3.x on
+	 * newer devices) and OpenFL compiles the shaders as GLSL ES. There is no Project.xml switch for
+	 * it, so log what the device actually handed us, together with the texture size limit that
+	 * oversized mod spritemaps run into.
+	 */
+	static function logGraphicsBackend(?context:lime.graphics.RenderContext):Void
+	{
+		Lib.current.stage.window.onRender.remove(logGraphicsBackend);
+		if (graphicsLogged) return;
+		graphicsLogged = true;
+
+		try
+		{
+			final version:String = lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.VERSION);
+			final renderer:String = lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.RENDERER);
+			final maxTexture:Int = lime.graphics.opengl.GL.getParameter(lime.graphics.opengl.GL.MAX_TEXTURE_SIZE);
+
+			trace('GRAPHICS: $version | $renderer | max texture size: ${maxTexture}px');
+			if (version == null || version.indexOf('OpenGL ES') < 0)
+				trace('GRAPHICS: expected an OpenGL ES context on Android but got "$version"; rendering may misbehave.');
+
+			backend.Paths.maxTextureSize = maxTexture;
+		}
+		catch (e:Dynamic) trace('GRAPHICS: could not read the GL context. ($e)');
+	}
+	#end
+
 
 	static function resetSpriteCache(sprite:Sprite):Void {
 		@:privateAccess {

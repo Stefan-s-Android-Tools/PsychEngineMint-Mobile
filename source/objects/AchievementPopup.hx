@@ -33,25 +33,29 @@ class AchievementPopup extends openfl.display.Sprite {
 
 		if(Paths.fileExists('images/$image-pixel.png', IMAGE))
 		{
-			graphic = Paths.image('$image-pixel', false);
+			graphic = Paths.image('$image-pixel', null, false);
 			hasAntialias = false;
 		}
-		else graphic = Paths.image(image, false);
+		else graphic = Paths.image(image, null, false);
 
 		#if MODS_ALLOWED
 		Mods.currentModDirectory = lastMod;
 		#end
 
-		if(graphic == null) graphic = Paths.image('unknownMod', false);
+		if(graphic == null) graphic = Paths.image('unknownMod', null, false);
 
 		var sizeX = 100;
 		var sizeY = 100;
 
 		var imgX = 15;
 		var imgY = 15;
-		var image = graphic.bitmap;
-		graphics.beginBitmapFill(image, new Matrix(sizeX / image.width, 0, 0, sizeY / image.height, imgX, imgY), false, hasAntialias);
-		graphics.drawRect(imgX, imgY, sizeX + 10, sizeY + 10);
+		// An icon that could not be decoded must not take the popup (and the song) down with it
+		var image:BitmapData = graphic != null ? graphic.bitmap : null;
+		if(image != null)
+		{
+			graphics.beginBitmapFill(image, new Matrix(sizeX / image.width, 0, 0, sizeY / image.height, imgX, imgY), false, hasAntialias);
+			graphics.drawRect(imgX, imgY, sizeX + 10, sizeY + 10);
+		}
 
 		// achievement name/description
 		var name:String = 'Unknown';

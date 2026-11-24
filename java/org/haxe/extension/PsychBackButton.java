@@ -14,6 +14,12 @@ public class PsychBackButton extends Extension {
 
 	private static volatile boolean pending = false;
 
+	// A single press can reach us twice (key down plus key up, or the legacy onBackPressed
+	// after the OnBackInvokedCallback). Two reports in a row open and instantly close the
+	// pause menu, so a report that follows another one this quickly is the same press.
+	private static final long DUPLICATE_WINDOW_MS = 250L;
+	private static volatile long lastReport = 0L;
+
 	@Override
 	public void onCreate (Bundle savedInstanceState) {
 
@@ -51,6 +57,15 @@ public class PsychBackButton extends Extension {
 		}
 
 		pending = false;
+
+		final long now = android.os.SystemClock.uptimeMillis ();
+
+		if (now - lastReport < DUPLICATE_WINDOW_MS) {
+
+			return false;
+		}
+
+		lastReport = now;
 		return true;
 	}
 
@@ -60,5 +75,6 @@ public class PsychBackButton extends Extension {
 	public static void clear () {
 
 		pending = false;
+		lastReport = 0L;
 	}
 }

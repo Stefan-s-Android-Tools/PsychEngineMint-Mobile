@@ -857,7 +857,7 @@ class FunkinLua implements FunkinScript {
 		registerFunction('getColorFromHex', function(color:String) return FlxColor.fromString('#$color'));
 
 		// precaching
-		registerFunction('precacheImage', function(name:String, ?allowGPU:Bool = true) Paths.image(name, allowGPU));
+		registerFunction('precacheImage', function(name:String, ?allowGPU:Bool = true) Paths.image(name, null, allowGPU));
 		registerFunction('precacheSound', function(name:String) Paths.sound(name));
 		registerFunction('precacheMusic', function(name:String) Paths.music(name));
 		

@@ -78,3 +78,21 @@ Expect noise from target-specific APIs (`FlxG.save`, `FlxG.sound`, `FlxG.mouse`,
 - `ClientPrefs.data.fpsRework` drives `FlxG.stage.window.frameRate` and leaves `FlxG.drawFramerate`/`updateFramerate`
   alone, which is what keeps the game from going "slow and smooth" when the device cannot reach the FPS cap. The FPS
   counter is scaled/clamped by `Main.updateFPSPosition()` from the `gameResized` signal.
+- `SystemBack` captures the owner of the mobile input **when the press is polled**, not when the action is read. A
+  substate opened by that press (the pause menu) reads `back` later in the same frame; resolving the owner at read time
+  made it count itself as the handler and resume immediately. Keep the capture in `poll()`.
+- A menu that opens a substate must not read `controls.BACK` in a frame where the substate was open: the sub menu
+  already consumed the press, and reading it again makes the menu skip a level (this is what sent `OptionsState` back
+  to `MainMenuState`). `OptionsState` does it with a `hadSubState` snapshot taken before `super.update()`.
+- `Paths.image(key, ?parentFolder:String, ?allowGPU:Bool)` — the second argument is a folder. Passing a `Bool` there
+  (e.g. `Paths.image(name, false)`) looks the file up in `assets/false/...` and returns `null`; use
+  `Paths.image(name, null, false)` for "no GPU cache".
+- Adobe Animate atlases from a mod are only found after `backend.AnimateAssets.ensureDiskSupport()`: flixel-animate
+  reads through `FlxAnimateAssets`, which only knows the packaged manifest. `Paths.getAnimateAtlas()` installs the
+  filesystem fallbacks and passes `cacheOnLoad` on the settings argument (`fromAnimate(folder, null, null, null, false, {cacheOnLoad: true})`).
+- `Paths.cacheBitmap()`/`returnSound()` log every failure with `Paths.describeFile()` (path, disk or package, size) and
+  never throw: a corrupted mod file must degrade to `null`/beep instead of taking the state down.
+- Android has no desktop OpenGL to switch away from: lime builds its GL backend against `GLES2/gl2.h` and links
+  `libGLESv2`/`libEGL` for android targets only, and OpenFL compiles the shaders as GLSL ES 100. `hardware="true"`
+  already means OpenGL ES; there is no Project.xml attribute for the GL version. `Main.logGraphicsBackend()` logs the
+  context and `Paths.maxTextureSize` (GLES2 only guarantees 2048px, so oversized mod spritemaps are reported).
