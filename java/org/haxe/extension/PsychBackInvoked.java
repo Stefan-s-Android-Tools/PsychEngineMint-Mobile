@@ -1,5 +1,6 @@
 package org.haxe.extension;
 
+import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
 /**
@@ -13,7 +14,7 @@ final class PsychBackInvoked {
 
 		Extension.mainActivity.getOnBackInvokedDispatcher ().registerOnBackInvokedCallback (
 			OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-			new OnBackInvokedDispatcher.OnBackInvokedCallback () {
+			new OnBackInvokedCallback () {
 
 				@Override
 				public void onBackInvoked () {

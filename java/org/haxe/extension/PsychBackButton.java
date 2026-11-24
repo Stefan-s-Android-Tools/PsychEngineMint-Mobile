@@ -31,7 +31,7 @@ public class PsychBackButton extends Extension {
 
 		notifyBack ();
 
-		// stop the chain: GameActivity finishes the activity when every extension returns true
+		// lime only calls super.onBackPressed (which finishes the activity) when every extension returns true
 		return false;
 	}
 
