@@ -23,6 +23,12 @@ class StorageUtil
 	public static final gameFolders:Array<String> = ['assets', 'mods', 'saves', 'crash', 'logs', 'backups'];
 
 	/**
+	 * Mod folder and mod list file, as used by `Mods`.
+	*/
+	public static final modsFolder:String = 'mods';
+	public static final modsListFile:String = 'modsList.txt';
+
+	/**
 	 * Records the app version that populated the data folder, so updates can refresh it.
 	*/
 	static inline final extractionMarker:String = '.assets_extracted';
@@ -139,6 +145,24 @@ class StorageUtil
 		return daPath;
 	}
 
+	#if android
+	/**
+	 * Asks Android for access to the shared storage folder the game writes to.
+	 * On Android 11+ this opens the "All files access" screen, older versions use the
+	 * regular read/write external storage runtime permission.
+	 */
+	public static function requestPermissions():Void
+	{
+		if (extension.androidtools.os.Environment.isExternalStorageManager())
+			return;
+
+		if (extension.androidtools.os.Build.VERSION.SDK_INT >= 30)
+			extension.androidtools.Settings.requestSetting('MANAGE_APP_ALL_FILES_ACCESS_PERMISSION');
+		else
+			extension.androidtools.Permissions.requestPermissions(['READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE']);
+	}
+	#end
+
 	/**
 	 * Checks whether `directory` can be written to. Used to fall back to the app data
 	 * folder when the external one is not accessible (missing MANAGE_EXTERNAL_STORAGE).
@@ -217,12 +241,22 @@ class StorageUtil
 		var failed:Int = 0;
 		for (id in ids)
 		{
-			if (!id.startsWith('assets/') || shouldSkipAsset(id))
+			if (shouldSkipAsset(id))
+				continue;
+
+			final isGameData:Bool = id.startsWith('assets/');
+			// The bundled mod template and mod list are only written when missing:
+			// `mods/` belongs to the player once the game is installed.
+			final isModData:Bool = id.startsWith('$modsFolder/') || id == modsListFile;
+			if (!isGameData && !isModData)
 				continue;
 
 			try
 			{
 				final target:String = dir + id;
+				if (isModData && FileSystem.exists(target))
+					continue;
+
 				createDirectories(Path.directory(target));
 
 				final bytes = OpenFlAssets.getBytes(id);
@@ -296,7 +330,26 @@ class StorageUtil
 		}
 
 		extractBundledAssets(directory);
+		ensureModsList(directory);
 		return verifyGameDirectory(directory);
+	}
+
+	/**
+	 * Creates an empty `modsList.txt` when the game has none, so `Mods` has a place to
+	 * store which mods are enabled. Existing files are never touched.
+	*/
+	public static function ensureModsList(directory:String):Void
+	{
+		final file:String = Path.addTrailingSlash(directory) + modsListFile;
+		if (FileSystem.exists(file))
+			return;
+
+		try
+		{
+			File.saveContent(file, '');
+		}
+		catch (e:Exception)
+			trace('Could not create "$file". (${e.message})');
 	}
 
 	static function shouldSkipAsset(id:String):Bool

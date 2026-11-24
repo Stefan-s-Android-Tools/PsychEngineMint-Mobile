@@ -13,6 +13,7 @@ import states.TitleState;
 	public var middleScroll:Bool = false;
 	public var opponentStrums:Bool = true;
 	public var showFPS:Bool = true;
+	public var fpsRework:Bool = false;
 	public var flashing:Bool = true;
 	public var autoPause:Bool = true;
 	public var antialiasing:Bool = true;
@@ -252,7 +253,12 @@ class ClientPrefs {
 		}
 		#end
 
-		if(data.framerate > FlxG.drawFramerate)
+		if (data.fpsRework)
+		{
+			// the window drives the frame pacing, `FPSCounter` keeps it in sync with the real FPS
+			FlxG.stage.window.frameRate = data.framerate;
+		}
+		else if(data.framerate > FlxG.drawFramerate)
 		{
 			FlxG.updateFramerate = data.framerate;
 			FlxG.drawFramerate = data.framerate;

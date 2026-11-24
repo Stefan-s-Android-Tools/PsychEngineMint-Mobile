@@ -4,6 +4,7 @@ import flixel.input.gamepad.FlxGamepadButton;
 import flixel.input.gamepad.FlxGamepadInputID;
 import flixel.input.gamepad.mappings.FlxGamepadMapping;
 import flixel.input.keyboard.FlxKey;
+import mobile.backend.SystemBack;
 import mobile.input.MobileInputID;
 import mobile.objects.IMobileControls;
 
@@ -100,7 +101,8 @@ class Controls
 		return result
 			|| _myGamepadJustPressed(gamepadBinds[key]) == true
 			|| mobileCJustPressed(mobileBinds[key]) == true
-			|| touchPadJustPressed(mobileBinds[key]) == true;
+			|| touchPadJustPressed(mobileBinds[key]) == true
+			|| systemBackJustPressed(key);
 	}
 
 	public function pressed(key:String)
@@ -111,7 +113,8 @@ class Controls
 		return result
 			|| _myGamepadPressed(gamepadBinds[key]) == true
 			|| mobileCPressed(mobileBinds[key]) == true
-			|| touchPadPressed(mobileBinds[key]) == true;
+			|| touchPadPressed(mobileBinds[key]) == true
+			|| SystemBack.pressed(key, requestedInstance);
 	}
 
 	public function justReleased(key:String)
@@ -176,6 +179,19 @@ class Controls
 	public var requestedInstance(get, never):MusicBeatSubstate;
 	public var requestedMobileC(get, never):IMobileControls;
 	public var mobileC(get, never):Bool;
+
+	/**
+	 * The Android back button and gesture are reported as `pause` during gameplay and as
+	 * `back` in the menus; only the state that owns the mobile input receives them.
+	 */
+	private function systemBackJustPressed(key:String):Bool
+	{
+		if (!SystemBack.justPressed(key, requestedInstance))
+			return false;
+
+		controllerMode = true;
+		return true;
+	}
 
 	private function touchPadPressed(keys:Array<MobileInputID>):Bool
 	{

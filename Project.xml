@@ -43,6 +43,9 @@
 	<!-- ____________________________ Android Settings __________________________ -->
 
 	<java path="source" />
+	<!-- Queues the system back button/gesture for the game instead of closing the activity -->
+	<java path="java" />
+	<config:android extension="org.haxe.extension.PsychBackButton" />
 
 	<config:android minimum-sdk-version="24" target-sdk-version="36" build-tools-version="36.0.0" />
 
@@ -120,7 +123,15 @@
 	</section>
 
 	<section if="MODS_ALLOWED">
-		<assets path='example_mods' rename='mods' embed='false' type='template' />
+		<!-- On desktop the mod template is copied next to the executable. Android has no
+		     writable folder there, so the APK carries it and StorageUtil extracts it on
+		     first launch without touching mods made by the player. -->
+		<assets path='example_mods' rename='mods' embed='false' type='template' unless="android" />
+		<assets path='list.txt' rename='modsList.txt' unless="android" />
+	</section>
+
+	<section if="MODS_ALLOWED android">
+		<assets path='example_mods' rename='mods' />
 		<assets path='list.txt' rename='modsList.txt' />
 	</section>
 

@@ -91,6 +91,8 @@ class Main extends Sprite
 		mobile.backend.StorageUtil.createDirectories(storageDir);
 		if (!mobile.backend.StorageUtil.isWritable(storageDir))
 		{
+			// ask for shared storage access before giving up on the external folder
+			mobile.backend.StorageUtil.requestPermissions();
 			trace('Cannot write to "$storageDir", falling back to "$fallbackDir"');
 			storageDir = fallbackDir;
 		}
@@ -140,7 +142,6 @@ class Main extends Sprite
 		traces = new ScriptTraceDisplay();
 		addChild(traces);
 		
-		#if !mobile
 		fpsVar = new FPSCounter(12, 4, 0xffffff);
 		addChild(fpsVar);
 		Lib.current.stage.align = "tl";
@@ -148,7 +149,6 @@ class Main extends Sprite
 		if(fpsVar != null) {
 			fpsVar.visible = ClientPrefs.data.showFPS;
 		}
-		#end
 		
 		#if (linux || mac) // fix the app icon not showing up on the Linux Panel / Mac Dock
 		var icon = Image.fromFile("icon.png");
@@ -174,8 +174,17 @@ class Main extends Sprite
 		FlxG.scaleMode = new MobileScaleMode();
 		#end
 
+		updateFPSPosition();
+
+		#if android
+		// the system back button/gesture is queued by the Java extension and has to be picked
+		// up once per frame, before any state reads `Controls`
+		FlxG.signals.preUpdate.add(mobile.backend.SystemBack.poll);
+		#end
+
 		// shader coords fix
 		FlxG.signals.gameResized.add((w:Int, h:Int) -> {
+			updateFPSPosition();
 		     if (FlxG.cameras != null) {
 			   for (cam in FlxG.cameras.list) {
 				if (cam != null && cam.filters != null)
@@ -188,6 +197,19 @@ class Main extends Sprite
 		});
 	}
 	
+	/**
+	 * Scales and clamps the FPS counter to the game view. Android renders the game in
+	 * physical pixels, so the counter has to follow the current scale factor to stay
+	 * readable and inside the screen on every resolution and density.
+	 */
+	public static function updateFPSPosition():Void
+	{
+		if (fpsVar == null) return;
+
+		final scale:Float = (FlxG.scaleMode != null ? FlxG.scaleMode.scale.x : 1);
+		fpsVar.positionFPS(12, 4, scale);
+	}
+
 	static function resetSpriteCache(sprite:Sprite):Void {
 		@:privateAccess {
 		        sprite.__cacheBitmap = null;

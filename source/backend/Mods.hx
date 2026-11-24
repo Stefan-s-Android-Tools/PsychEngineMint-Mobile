@@ -50,21 +50,33 @@ class Mods
 	inline public static function getModDirectories():Array<String>
 	{
 		var list:Array<String> = [];
-		
+
 		#if MODS_ALLOWED
 		var modsFolder:String = Paths.mods();
-		
-		if (FileSystem.exists(modsFolder)) {
+
+		if (!FileSystem.exists(modsFolder)) {
+			// the player may have deleted the folder, or this is the first launch after an update
+			try FileSystem.createDirectory(modsFolder) catch (e:Dynamic) trace('Could not create "$modsFolder". ($e)');
+		}
+
+		if (FileSystem.exists(modsFolder) && FileSystem.isDirectory(modsFolder)) {
 			for (folder in FileSystem.readDirectory(modsFolder)) {
 				if (directoryIsMod(folder))
 					list.push(folder);
 			}
 		}
 		#end
-		
+
 		return list;
 	}
-	
+
+	/**
+	 * Name of the file that stores which mods are enabled. Psych Engine expects it
+	 * next to the game folder, not inside `mods/`.
+	*/
+	inline public static function modsListPath():String
+		return 'modsList.txt';
+
 	inline public static function mergeAllTextsNamed(path:String, ?defaultDirectory:String = null, allowDuplicates:Bool = false)
 	{
 		if(defaultDirectory == null) defaultDirectory = Paths.getSharedPath();
@@ -159,25 +171,25 @@ class Mods
 		var list:ModsList = {enabled: [], disabled: [], all: [], available: []};
 		
 		#if MODS_ALLOWED
-		#if sys if (FileSystem.exists('modsList.txt')) {
+		#if sys if (FileSystem.exists(modsListPath())) {
 			try {
-				for (mod in CoolUtil.coolTextFile('modsList.txt')) {
-					if (mod.trim().length < 1) continue;
-					
+				for (mod in CoolUtil.coolTextFile(modsListPath())) {
+					if (mod.trim().length < 1 || !mod.contains('|')) continue;
+
 					var dat = mod.split('|');
-					var folder:String = dat[0];
-					var modEnabled:Bool = (dat[1] == '1');
-					
+					var folder:String = dat[0].trim();
+					var modEnabled:Bool = (dat[1].trim() == '1');
+					if (folder.length < 1) continue;
+
 					list.all.push(folder);
 					(modEnabled ? list.enabled : list.disabled).push(folder);
 					if (directoryIsMod(folder)) list.available.push(folder);
-					
+
 					ClientPrefs.modsEnabled.set(folder, modEnabled);
 				}
 			} catch(e) {
-				trace(e);
-				
-				FileSystem.deleteFile('modsList.txt');
+				// never delete the list: one broken line must not throw away the player's mod order
+				trace('Could not read ${modsListPath()}: $e');
 			}
 		} else #end {
 			for (mod => enabled in ClientPrefs.modsEnabled) {
@@ -211,8 +223,12 @@ class Mods
 		var content:String = '';
 		for (mod in list.available)
 			content += '$mod|${list.enabled.contains(mod) ? 1 : 0}\n';
-		
-		File.saveContent('modsList.txt', content);
+
+		try {
+			File.saveContent(modsListPath(), content);
+		} catch(e) {
+			trace('Could not write ${modsListPath()}: $e');
+		}
 		#end
 		
 		updatedOnState = true;
@@ -227,7 +243,11 @@ class Mods
 		if (FileSystem.exists(dir) && FileSystem.isDirectory(dir)) {
 			if (FileSystem.exists('$dir/.notamod'))
 				return false;
-			
+
+			// some mods only ship metadata, a pack.json is enough to mark the folder as a mod
+			if (FileSystem.exists('$dir/pack.json'))
+				return true;
+
 			for (sub in ignoreModFolders) {
 				if (FileSystem.exists('$dir/$sub'))
 					return true;

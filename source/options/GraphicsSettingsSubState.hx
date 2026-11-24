@@ -56,6 +56,13 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		option.defaultValue = Std.int(FlxMath.bound(refreshRate, option.minValue, option.maxValue));
 		option.displayFormat = '%v FPS';
 		option.onChange = onChangeFramerate;
+
+		var option:Option = new Option('FPS Rework',
+			'If checked, this works around the game becoming "slow" and "smooth" when the\ncurrent FPS is lower than the FPS cap.',
+			'fpsRework',
+			BOOL);
+		option.onChange = onChangeFPSRework;
+		addOption(option);
 		#end
 		
 		insert(1, boyfriend);
@@ -72,8 +79,28 @@ class GraphicsSettingsSubState extends BaseOptionsMenu
 		}
 	}
 
+	function onChangeFPSRework(?_, ?_)
+	{
+		if (ClientPrefs.data.fpsRework)
+		{
+			if (FlxG.stage.window.frameRate != ClientPrefs.data.framerate)
+				FlxG.stage.window.frameRate = ClientPrefs.data.framerate;
+		}
+		else
+		{
+			// restore the plain framerate settings, the counter stops retuning them
+			FlxG.updateFramerate = FlxG.drawFramerate = ClientPrefs.data.framerate;
+		}
+	}
+
 	function onChangeFramerate(?_, ?_)
 	{
+		if (ClientPrefs.data.fpsRework)
+		{
+			FlxG.stage.window.frameRate = ClientPrefs.data.framerate;
+			return;
+		}
+
 		if(ClientPrefs.data.framerate > FlxG.drawFramerate)
 		{
 			FlxG.updateFramerate = ClientPrefs.data.framerate;
