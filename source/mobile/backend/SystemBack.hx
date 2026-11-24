@@ -36,6 +36,13 @@ class SystemBack
 
 		if (consumeFunction != null && consumeFunction() == true)
 			pending = true;
+
+		// while a text field is being edited, back only has to close the on-screen keyboard
+		if (pending && backend.ui.PsychUIInputText.focusOn != null)
+		{
+			backend.ui.PsychUIInputText.focusOn = null;
+			pending = false;
+		}
 	}
 #end
 
