@@ -66,3 +66,15 @@ Expect noise from target-specific APIs (`FlxG.save`, `FlxG.sound`, `FlxG.mouse`,
 - `ClientPrefs.data.wideScreen` defaults to false so `MobileScaleMode` letterboxes/pillarboxes; the "Wide Screen Mode"
   option still stretches for users who enable it. `settingsVersion` migrates old saves that carried the stretch default.
 - `MobileControlSelectSubState` declares its reset button as `resetBtn`; `reset()` is already a method on `MusicBeatSubstate`, so a field named `reset` will not compile.
+- Editors exit with `controls.BACK`, never with `FlxG.keys.justPressed.ESCAPE` alone: the system back button is folded
+  into `Controls.justPressed('back')` through `SystemBack`, and there is no ESC key on a phone. The same applies to
+  `PsychUIInputText.focusOn == null` guards, which also keep the on-screen keyboard from eating the key.
+- Editor pads live in `assets/shared/mobile/ActionModes/*.json`; `CHARACTER_EDITOR` is shared by the character and stage
+  editors, `DIALOGUE_PORTRAIT` carries a `buttonG` used as a modifier (G+arrows nudge loop offsets, arrows nudge idle
+  offsets). Add a button to the JSON before reading `touchPad.buttonG` in code.
+- `Paths.getSparrowAtlas()`/`getPackerAtlas()`/`getAsepriteAtlas()` read the atlas description through the same
+  `getPath()` rule as the image (`Paths.getAtlasText()`). Do not reintroduce `modsXml()`/`modsTxt()`: they ignore
+  `parentFolder` and give a mod image the base game frame rectangles.
+- `ClientPrefs.data.fpsRework` drives `FlxG.stage.window.frameRate` and leaves `FlxG.drawFramerate`/`updateFramerate`
+  alone, which is what keeps the game from going "slow and smooth" when the device cannot reach the FPS cap. The FPS
+  counter is scaled/clamped by `Main.updateFPSPosition()` from the `gameResized` signal.
