@@ -93,7 +93,7 @@ class DialogueEditorState extends MusicBeatState implements PsychUIEventHandler.
 	var UI_box:PsychUIBox;
 	function addEditorBox()
 	{
-		UI_box = new PsychUIBox(FlxG.width - 260, 10, 250, 210, ['Dialogue Line']);
+		UI_box = new PsychUIBox(FlxG.width - 260, 10, 250, 250, ['Dialogue Line']);
 		UI_box.scrollFactor.set();
 		addDialogueLineUI();
 		add(UI_box);
@@ -135,6 +135,15 @@ class DialogueEditorState extends MusicBeatState implements PsychUIEventHandler.
 		var saveButton:PsychUIButton = new PsychUIButton(loadButton.x + 120, loadButton.y, "Save Dialogue", function() {
 			saveDialogue();
 		});
+		var addButton:PsychUIButton = new PsychUIButton(loadButton.x, loadButton.y + 30, "Add Line", function() {
+			dialogueFile.dialogue.insert(curSelected + 1, copyDefaultLine());
+			changeText(1);
+		});
+		var removeButton:PsychUIButton = new PsychUIButton(addButton.x + 120, addButton.y, "Remove Line", function() {
+			dialogueFile.dialogue.remove(dialogueFile.dialogue[curSelected]);
+			if(dialogueFile.dialogue.length < 1) dialogueFile.dialogue = [copyDefaultLine()];
+			changeText();
+		});
 
 		tab_group.add(new FlxText(10, speedStepper.y - 18, 0, 'Interval/Speed (ms):'));
 		tab_group.add(new FlxText(10, characterInputText.y - 18, 0, 'Character:'));
@@ -147,6 +156,8 @@ class DialogueEditorState extends MusicBeatState implements PsychUIEventHandler.
 		tab_group.add(lineInputText);
 		tab_group.add(loadButton);
 		tab_group.add(saveButton);
+		tab_group.add(addButton);
+		tab_group.add(removeButton);
 	}
 
 	function copyDefaultLine():DialogueLine {
@@ -316,10 +327,10 @@ class DialogueEditorState extends MusicBeatState implements PsychUIEventHandler.
 		if(PsychUIInputText.focusOn == null)
 		{
 			ClientPrefs.toggleVolumeKeys(true);
-			if(FlxG.keys.justPressed.SPACE) {
+			if(FlxG.keys.justPressed.SPACE #if mobile || touchPad.buttonX.justPressed #end) {
 				reloadText(false);
 			}
-			if(FlxG.keys.justPressed.ESCAPE) {
+			if(FlxG.keys.justPressed.ESCAPE #if mobile || controls.BACK #end) {
 				if(!unsavedProgress)
 				{
 					MusicBeatState.switchState(new states.MainMenuState(true));
@@ -330,8 +341,8 @@ class DialogueEditorState extends MusicBeatState implements PsychUIEventHandler.
 				return;
 			}
 			var negaMult:Array<Int> = [1, -1];
-			var controlAnim:Array<Bool> = [FlxG.keys.justPressed.W, FlxG.keys.justPressed.S];
-			var controlText:Array<Bool> = [FlxG.keys.justPressed.D, FlxG.keys.justPressed.A];
+			var controlAnim:Array<Bool> = [FlxG.keys.justPressed.W #if mobile || controls.UI_UP_P #end, FlxG.keys.justPressed.S #if mobile || controls.UI_DOWN_P #end];
+			var controlText:Array<Bool> = [FlxG.keys.justPressed.D #if mobile || controls.UI_RIGHT_P #end, FlxG.keys.justPressed.A #if mobile || controls.UI_LEFT_P #end];
 			for (i in 0...controlAnim.length) {
 				if(controlAnim[i] && character.jsonFile.animations.length > 0) {
 					curAnim -= negaMult[i];

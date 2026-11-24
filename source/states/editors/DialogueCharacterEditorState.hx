@@ -139,6 +139,7 @@ class DialogueCharacterEditorState extends MusicBeatState implements PsychUIEven
 		
 		#if mobile
 		addTouchPad('DIALOGUE_PORTRAIT', 'DIALOGUE_PORTRAIT');
+		addTouchPadCamera();
 		#end
 
 		super.create();
@@ -464,7 +465,7 @@ class DialogueCharacterEditorState extends MusicBeatState implements PsychUIEven
 		if(PsychUIInputText.focusOn == null)
 		{
 			ClientPrefs.toggleVolumeKeys(true);
-			if(FlxG.keys.justPressed.SPACE && UI_mainbox.selectedName == 'Character') {
+			if((FlxG.keys.justPressed.SPACE #if mobile || touchPad.buttonA.justPressed #end) && UI_mainbox.selectedName == 'Character') {
 				character.playAnim(character.jsonFile.animations[curAnim].anim);
 				daText.resetDialogue();
 				updateTextBox();
@@ -473,13 +474,18 @@ class DialogueCharacterEditorState extends MusicBeatState implements PsychUIEven
 			//lots of Ifs lol get trolled
 			var offsetAdd:Int = 1;
 			var speed:Float = 300;
-			if(FlxG.keys.pressed.SHIFT) {
+			#if mobile
+			// the arrows pan the scene except on the animations tab, where they nudge the offsets
+			var animsTab:Bool = UI_mainbox.selectedName == 'Animations' && curSelectedAnim != null && character.dialogueAnimations.exists(curSelectedAnim);
+			var padPan:Bool = !animsTab && !touchPad.buttonG.pressed;
+			#end
+			if(FlxG.keys.pressed.SHIFT #if mobile || touchPad.buttonC.pressed #end) {
 				speed = 1200;
 				offsetAdd = 10;
 			}
 
 			var negaMult:Array<Int> = [1, 1, -1, -1];
-			var controlArray:Array<Bool> = [FlxG.keys.pressed.J, FlxG.keys.pressed.I, FlxG.keys.pressed.L, FlxG.keys.pressed.K];
+			var controlArray:Array<Bool> = [FlxG.keys.pressed.J #if mobile || (padPan && touchPad.buttonLeft.pressed) #end, FlxG.keys.pressed.I #if mobile || (padPan && touchPad.buttonUp.pressed) #end, FlxG.keys.pressed.L #if mobile || (padPan && touchPad.buttonRight.pressed) #end, FlxG.keys.pressed.K #if mobile || (padPan && touchPad.buttonDown.pressed) #end];
 			for (i in 0...controlArray.length) {
 				if(controlArray[i]) {
 					if(i % 2 == 1) {
@@ -493,8 +499,8 @@ class DialogueCharacterEditorState extends MusicBeatState implements PsychUIEven
 			if(UI_mainbox.selectedName == 'Animations' && curSelectedAnim != null && character.dialogueAnimations.exists(curSelectedAnim)) {
 				var moved:Bool = false;
 				var animShit:DialogueAnimArray = character.dialogueAnimations.get(curSelectedAnim);
-				var controlArrayLoop:Array<Bool> = [FlxG.keys.justPressed.A, FlxG.keys.justPressed.W, FlxG.keys.justPressed.D, FlxG.keys.justPressed.S];
-				var controlArrayIdle:Array<Bool> = [FlxG.keys.justPressed.LEFT, FlxG.keys.justPressed.UP, FlxG.keys.justPressed.RIGHT, FlxG.keys.justPressed.DOWN];
+				var controlArrayLoop:Array<Bool> = [FlxG.keys.justPressed.A #if mobile || (touchPad.buttonG.pressed && touchPad.buttonLeft.justPressed) #end, FlxG.keys.justPressed.W #if mobile || (touchPad.buttonG.pressed && touchPad.buttonUp.justPressed) #end, FlxG.keys.justPressed.D #if mobile || (touchPad.buttonG.pressed && touchPad.buttonRight.justPressed) #end, FlxG.keys.justPressed.S #if mobile || (touchPad.buttonG.pressed && touchPad.buttonDown.justPressed) #end];
+				var controlArrayIdle:Array<Bool> = [FlxG.keys.justPressed.LEFT #if mobile || (!touchPad.buttonG.pressed && touchPad.buttonLeft.justPressed) #end, FlxG.keys.justPressed.UP #if mobile || (!touchPad.buttonG.pressed && touchPad.buttonUp.justPressed) #end, FlxG.keys.justPressed.RIGHT #if mobile || (!touchPad.buttonG.pressed && touchPad.buttonRight.justPressed) #end, FlxG.keys.justPressed.DOWN #if mobile || (!touchPad.buttonG.pressed && touchPad.buttonDown.justPressed) #end];
 				for (i in 0...controlArrayLoop.length) {
 					if(controlArrayLoop[i]) {
 						if(i % 2 == 1) {
@@ -524,15 +530,15 @@ class DialogueCharacterEditorState extends MusicBeatState implements PsychUIEven
 				}
 			}
 
-			if (FlxG.keys.pressed.Q && camGame.zoom > 0.1) {
+			if ((FlxG.keys.pressed.Q #if mobile || touchPad.buttonX.pressed #end) && camGame.zoom > 0.1) {
 				camGame.zoom -= elapsed * camGame.zoom;
 				if(camGame.zoom < 0.1) camGame.zoom = 0.1;
 			}
-			if (FlxG.keys.pressed.E && camGame.zoom < 1) {
+			if ((FlxG.keys.pressed.E #if mobile || touchPad.buttonY.pressed #end) && camGame.zoom < 1) {
 				camGame.zoom += elapsed * camGame.zoom;
 				if(camGame.zoom > 1) camGame.zoom = 1;
 			}
-			if(FlxG.keys.justPressed.H) {
+			if(FlxG.keys.justPressed.H #if mobile || (touchPad.buttonG.pressed && touchPad.buttonZ.justPressed) #end) {
 				if(UI_mainbox.selectedName == 'Animations') {
 					currentGhosts++;
 					if(currentGhosts > 2) currentGhosts = 0;
@@ -545,7 +551,7 @@ class DialogueCharacterEditorState extends MusicBeatState implements PsychUIEven
 					hudGroup.visible = !hudGroup.visible;
 				}
 			}
-			if(FlxG.keys.justPressed.R) {
+			if(FlxG.keys.justPressed.R #if mobile || (touchPad.buttonZ.justPressed && !touchPad.buttonG.pressed) #end) {
 				camGame.zoom = 1;
 				mainGroup.setPosition(0, 0);
 				hudGroup.visible = true;
@@ -607,7 +613,7 @@ class DialogueCharacterEditorState extends MusicBeatState implements PsychUIEven
 				}
 			}
 
-			if(FlxG.keys.justPressed.ESCAPE) {
+			if(FlxG.keys.justPressed.ESCAPE #if mobile || controls.BACK #end) {
 				if(!unsavedProgress)
 				{
 					MusicBeatState.switchState(new states.MainMenuState(true));

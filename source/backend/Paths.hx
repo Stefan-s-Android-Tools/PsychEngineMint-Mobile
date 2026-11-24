@@ -311,8 +311,13 @@ class Paths
 			var file:String = getPath(key, IMAGE, parentFolder, true);
 			#if (MODS_ALLOWED && sys)
 			if (FileSystem.exists(file))
-				bitmap = BitmapData.fromFile(file);
-			else #end if (OpenFlAssets.exists(file, IMAGE))
+			{
+				// an existing file can still fail to decode (corrupt or unsupported bit depth)
+				try bitmap = BitmapData.fromFile(file)
+				catch (e:Dynamic) trace('Could not decode "$file". ($e)');
+			}
+			#end
+			if (bitmap == null && OpenFlAssets.exists(file, IMAGE))
 				bitmap = OpenFlAssets.getBitmapData(file);
 
 			if (bitmap == null)
@@ -405,7 +410,7 @@ class Paths
 	static public function getMultiAtlas(keys:Array<String>, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		
-		var parentFrames:FlxAtlasFrames = Paths.getAtlas(keys[0].trim());
+		var parentFrames:FlxAtlasFrames = Paths.getAtlas(keys[0].trim(), parentFolder, allowGPU);
 		if(keys.length > 1)
 		{
 			var original:FlxAtlasFrames = parentFrames;
@@ -424,46 +429,49 @@ class Paths
 	inline static public function getSparrowAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
-		#if (MODS_ALLOWED && sys)
-		var xmlExists:Bool = false;
+		if (imageLoaded == null) return null;
 
-		var xml:String = modsXml(key);
-		if(FileSystem.exists(xml)) xmlExists = true;
-		
-		return FlxAtlasFrames.fromSparrow(imageLoaded, (xmlExists ? getTextFromFile(xml) : getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder)));
-		#else
-		return FlxAtlasFrames.fromSparrow(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.xml', TEXT, parentFolder));
-		#end
+		var text:String = getAtlasText(key, '.xml', parentFolder);
+		if (text == null) return new FlxAtlasFrames(imageLoaded);
+		return FlxAtlasFrames.fromSparrow(imageLoaded, text);
 	}
 
 	inline static public function getPackerAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
-		#if (MODS_ALLOWED && sys)
-		var txtExists:Bool = false;
-		
-		var txt:String = modsTxt(key);
-		if(FileSystem.exists(txt)) txtExists = true;
+		if (imageLoaded == null) return null;
 
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, (txtExists ? getTextFromFile(txt) : getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder)));
-		#else
-		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.txt', TEXT, parentFolder));
-		#end
+		var text:String = getAtlasText(key, '.txt', parentFolder);
+		if (text == null) return new FlxAtlasFrames(imageLoaded);
+		return FlxAtlasFrames.fromSpriteSheetPacker(imageLoaded, text);
 	}
 
 	inline static public function getAsepriteAtlas(key:String, ?parentFolder:String = null, ?allowGPU:Bool = true):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, parentFolder, allowGPU);
-		#if (MODS_ALLOWED && sys)
-		var jsonExists:Bool = false;
+		if (imageLoaded == null) return null;
 
-		var json:String = modsImagesJson(key);
-		if(FileSystem.exists(json)) jsonExists = true;
+		var text:String = getAtlasText(key, '.json', parentFolder);
+		if (text == null) return new FlxAtlasFrames(imageLoaded);
+		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, text);
+	}
 
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, (jsonExists ? getTextFromFile(json) : getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder)));
-		#else
-		return FlxAtlasFrames.fromTexturePackerJson(imageLoaded, getPath(Language.getFileTranslation('images/$key') + '.json', TEXT, parentFolder));
-		#end
+	/**
+	 * Reads the description of an atlas from the same folder as its image. A mod that ships a
+	 * new image without its description would otherwise keep the frame rectangles of the base
+	 * game, which shows up as shifted or cut sprites.
+	 */
+	static function getAtlasText(key:String, extension:String, ?parentFolder:String):String
+	{
+		var path:String = getPath(Language.getFileTranslation('images/$key') + extension, TEXT, parentFolder);
+		var text:String = getTextFromFile(path);
+
+		if (text == null || StringTools.trim(text).length < 1)
+		{
+			trace('Missing atlas description "$path" for "$key".');
+			return null;
+		}
+		return text;
 	}
 
 	inline static public function formatToSongPath(path:String) {
