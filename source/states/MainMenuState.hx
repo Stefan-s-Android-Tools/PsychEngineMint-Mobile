@@ -3,6 +3,7 @@ package states;
 import flixel.FlxObject;
 import flixel.effects.FlxFlicker;
 import lime.app.Application;
+import mobile.input.MobileInputID;
 import states.editors.MasterEditorMenu;
 import options.OptionsState;
 
@@ -152,6 +153,11 @@ class MainMenuState extends ScriptedState
 			leftItem = addMenuItem(leftOption, null, LEFT);
 		
 		add(menuItems);
+		
+		#if mobile
+		// the main menu is navigated by tapping the icons, so only the editor shortcut is added
+		addTouchPad('NONE', 'E');
+		#end
 		
 		super.create();
 		
@@ -353,7 +359,7 @@ class MainMenuState extends ScriptedState
 					fade(false, item);
 				}
 			}
-			if (controls.justPressed('debug_1')) {
+			if (controls.justPressed('debug_1') #if mobile || controls.mobileJustPressed(MobileInputID.E) #end) {
 				selectedSomethin = true;
 				FlxG.mouse.visible = false;
 				openSubState(new MasterEditorMenu());

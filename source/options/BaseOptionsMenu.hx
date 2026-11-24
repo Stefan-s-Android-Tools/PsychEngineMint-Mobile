@@ -1,5 +1,7 @@
 package options;
 
+import mobile.input.MobileInputID;
+
 import psychlua.LuaUtils;
 
 import flixel.input.keyboard.FlxKey;
@@ -159,7 +161,7 @@ class BaseOptionsMenu extends ScriptedSubState
 			changeSelection(1);
 		}
 
-		if (controls.BACK) {
+		if (controls.BACK || controls.mobileJustPressed(MobileInputID.C)) {
 			close();
 			FlxG.sound.play(Paths.sound('cancelMenu'));
 		}

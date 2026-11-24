@@ -74,6 +74,15 @@ class ResetScoreSubState extends MusicBeatSubstate
 		updateOptions();
 	}
 
+	override function create():Void
+	{
+		super.create();
+
+		#if mobile
+		addTouchPad('LEFT_FULL', 'A_B');
+		#end
+	}
+
 	override function update(elapsed:Float)
 	{
 		bg.alpha += elapsed * 1.5;

@@ -25,6 +25,10 @@ import states.editors.content.VSlice;
 import states.editors.content.Prompt;
 import states.editors.content.*;
 
+#if mobile
+import mobile.backend.StorageUtil;
+#end
+
 import backend.Song;
 import backend.StageData;
 import backend.Highscore;
@@ -571,6 +575,7 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 		
 		#if mobile
 		addTouchPad('LEFT_FULL', 'CHART_EDITOR');
+		addTouchPadCamera();
 		#end
 
 		super.create();
@@ -877,18 +882,47 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 		
 		outputAlpha = Math.max(0, outputAlpha - elapsed);
 		var holdingAlt:Bool = FlxG.keys.pressed.ALT;
+		#if mobile
+		// the pad mirrors the keyboard shortcuts, none of these buttons has an engine action
+		final padAlt:Bool = touchPad != null && touchPad.buttonG.pressed;
+		final padShift:Bool = touchPad != null && touchPad.buttonY.pressed;
+		final padUp:Bool = touchPad != null && touchPad.buttonUp2.pressed;
+		final padDown:Bool = touchPad != null && touchPad.buttonDown2.pressed;
+		final padPlay:Bool = touchPad != null && touchPad.buttonX.justPressed;
+		final padTips:Bool = touchPad != null && touchPad.buttonF.justPressed;
+		final padPreview:Bool = touchPad != null && touchPad.buttonC.justPressed;
+		final padPlaytest:Bool = touchPad != null && touchPad.buttonA.justPressed;
+		final padZoomIn:Bool = touchPad != null && touchPad.buttonD.justPressed;
+		final padZoomOut:Bool = touchPad != null && touchPad.buttonV.justPressed;
+		final padUndo:Bool = touchPad != null && touchPad.buttonH.justPressed;
+		final padSave:Bool = touchPad != null && touchPad.buttonZ.justPressed;
+		holdingAlt = holdingAlt || padAlt;
+
+		if (charterFocus)
+		{
+			if (padUndo)
+				undo();
+			else if (padSave)
+				saveChart();
+		}
+
+		if (padZoomIn)
+			changeZoom(true);
+		else if (padZoomOut)
+			changeZoom(false);
+		#end
 		if(FlxG.sound.music != null)
 		{
 			if(charterFocus) //If not typing anything
 			{
-				if(FlxG.keys.justPressed.F12)
+				if(FlxG.keys.justPressed.F12 #if mobile || padPreview #end)
 				{
 					super.update(elapsed);
 					openEditorPlayState();
 					lastFocus = PsychUIInputText.focusOn;
 					return;
 				}
-				else if(FlxG.keys.justPressed.F1)
+				else if(FlxG.keys.justPressed.F1 #if mobile || padTips #end)
 				{
 					var vis:Bool = !fullTipText.visible;
 					tipBg.visible = tipBg.active = fullTipText.visible = fullTipText.active = vis;
@@ -934,7 +968,7 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 					Conductor.songPosition = timeToGoBack;
 					setSongPlaying(songPlaying);
 				}
-				else if(FlxG.keys.pressed.W != FlxG.keys.pressed.S || FlxG.mouse.wheel != 0)
+				else if(FlxG.keys.pressed.W != FlxG.keys.pressed.S || FlxG.mouse.wheel != 0 #if mobile || padUp != padDown #end)
 				{
 					if (FlxG.sound.music.playing)
 						setSongPlaying(false);
@@ -947,16 +981,16 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 					}
 					else
 					{
-						var speedMult:Float = (FlxG.keys.pressed.SHIFT ? 4 : 1) * (FlxG.mouse.wheel != 0 ? 4 : 1) / (holdingAlt ? 4 : 1) * downScrollMult;
-						if (FlxG.keys.pressed.W || FlxG.mouse.wheel > 0)
+						var speedMult:Float = (FlxG.keys.pressed.SHIFT #if mobile || padShift #end ? 4 : 1) * (FlxG.mouse.wheel != 0 ? 4 : 1) / (holdingAlt ? 4 : 1) * downScrollMult;
+						if (FlxG.keys.pressed.W || FlxG.mouse.wheel > 0 #if mobile || padUp #end)
 							Conductor.songPosition -= Conductor.crochet * speedMult * 1.5 * elapsed / curZoom;
-						else if (FlxG.keys.pressed.S || FlxG.mouse.wheel < 0)
+						else if (FlxG.keys.pressed.S || FlxG.mouse.wheel < 0 #if mobile || padDown #end)
 							Conductor.songPosition += Conductor.crochet * speedMult * 1.5 * elapsed / curZoom;
 					}
 
 					Conductor.songPosition = FlxMath.bound(Conductor.songPosition, 0, FlxG.sound.music.length + Conductor.offset + delay - 1);
 				}
-				if(FlxG.keys.justPressed.SPACE)
+				if(FlxG.keys.justPressed.SPACE #if mobile || padPlay #end)
 				{
 					setSongPlaying(!FlxG.sound.music.playing);
 				}
@@ -1000,7 +1034,7 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 		{
 			var doCut:Bool = false;
 			var canContinue:Bool = true;
-			if(FlxG.keys.justPressed.ENTER)
+			if(FlxG.keys.justPressed.ENTER #if mobile || padPlaytest #end)
 			{
 				goToPlayState();
 				return;
@@ -3931,9 +3965,14 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 				upperBox.isMinimized = true;
 	
 				updateChartData();
+				#if mobile
+				StorageUtil.saveContent('events.json', PsychJsonPrinter.print({events: PlayState.SONG.events, format: 'psych_v1'}, ['events']), false);
+				showOutput('Events saved to: saves/events.json');
+				#else
 				fileDialog.save('events.json', PsychJsonPrinter.print({events: PlayState.SONG.events, format: 'psych_v1'}, ['events']),
 					function() showOutput('Events saved successfully to: ${fileDialog.path}'), null,
 					function() showOutput('Error on saving events!', true));
+				#end
 			}, btnWid);
 			btn.text.alignment = LEFT;
 			tab_group.add(btn);
@@ -4990,6 +5029,10 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 		#end {
 			var chartName:String = Paths.formatToSongPath(PlayState.SONG.song) + '.json';
 			if(Song.chartPath != null) chartName = Song.chartPath.substr(Song.chartPath.lastIndexOf('/')).trim();
+			#if mobile
+			StorageUtil.saveContent(chartName, chartData, false);
+			showOutput('Chart saved to: saves/$chartName');
+			#else
 			fileDialog.save(chartName, chartData,
 				function()
 				{
@@ -5004,6 +5047,7 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 					#end
 
 				}, null, function() showOutput('Error on saving chart!', true));
+			#end
 		}
 	}
 	
@@ -5284,22 +5328,8 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 					forceDataUpdate = true;
 					
 				case FlxKey.Z | FlxKey.X: // zooming
-					if (eventKey == FlxKey.Z) {
-						curZoom = zoomList[Std.int(Math.max(zoomList.indexOf(curZoom) - 1, 0))];
-					} else {
-						curZoom = zoomList[Std.int(Math.min(zoomList.indexOf(curZoom) + 1, zoomList.length - 1))];
-					}
+					changeZoom(eventKey == FlxKey.X);
 
-					notes.sort(PlayState.sortByTime);
-					forEachRenderedNote((note:MetaNote) -> {
-						positionNoteYOnTime(note);
-						note.updateSustainToZoom(curZoom);
-					});
-					
-					loadSection();
-					showOutput('Zoom: ${Math.round(curZoom * 100)}%');
-					updateScrollY();
-					
 				case FlxKey.A | FlxKey.D:
 					var shiftAdd:Int = (FlxG.keys.pressed.SHIFT ? 4 : 1);
 					
@@ -5565,6 +5595,27 @@ class ChartingState extends ScriptedState implements PsychUIEventHandler.PsychUI
 				}
 			}
 		}
+	}
+
+	/**
+	 * Steps the chart zoom one entry up or down the zoom list.
+	 */
+	function changeZoom(zoomIn:Bool):Void
+	{
+		if (zoomIn)
+			curZoom = zoomList[Std.int(Math.min(zoomList.indexOf(curZoom) + 1, zoomList.length - 1))];
+		else
+			curZoom = zoomList[Std.int(Math.max(zoomList.indexOf(curZoom) - 1, 0))];
+
+		notes.sort(PlayState.sortByTime);
+		forEachRenderedNote((note:MetaNote) -> {
+			positionNoteYOnTime(note);
+			note.updateSustainToZoom(curZoom);
+		});
+
+		loadSection();
+		showOutput('Zoom: ${Math.round(curZoom * 100)}%');
+		updateScrollY();
 	}
 
 	function undo()

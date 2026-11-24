@@ -193,6 +193,20 @@ class Controls
 		return true;
 	}
 
+	/**
+	 * Reads an extra mobile button that no engine action is bound to (editor shortcuts and
+	 * similar). Like every other mobile read, only the owner of the input sees it.
+	 */
+	public function mobileJustPressed(button:MobileInputID):Bool
+	{
+		var touchPad = requestedInstance != null ? requestedInstance.touchPad : null;
+		if (touchPad == null || touchPad.anyJustPressed([button]) != true)
+			return false;
+
+		controllerMode = true;
+		return true;
+	}
+
 	private function touchPadPressed(keys:Array<MobileInputID>):Bool
 	{
 		var touchPad = requestedInstance != null ? requestedInstance.touchPad : null;

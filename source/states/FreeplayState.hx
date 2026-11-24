@@ -7,6 +7,7 @@ import backend.Song;
 import objects.HealthIcon;
 import objects.MusicPlayer;
 
+import mobile.input.MobileInputID;
 import options.GameplayChangersSubState;
 import substates.ResetScoreSubState;
 
@@ -174,6 +175,9 @@ class FreeplayState extends ScriptedState
 		add(bottomBG);
 
 		var leText:String = Language.getPhrase("freeplay_tip", "Press SPACE to listen to the Song / Press CTRL to open the Gameplay Changers Menu / Press RESET to Reset your Score and Accuracy.");
+		#if mobile
+		leText = Language.getPhrase("freeplay_tip_mobile", "Press X to listen to the Song / Press C to open the Gameplay Changers Menu / Press Y to Reset your Score and Accuracy.");
+		#end
 		bottomString = leText;
 		var size:Int = 16;
 		bottomText = new FlxText(bottomBG.x, bottomBG.y + 4, FlxG.width, leText, size);
@@ -187,7 +191,7 @@ class FreeplayState extends ScriptedState
 		changeSelection();
 		updateTexts();
 		#if mobile
-			addTouchPad('LEFT_FULL', 'A_B');
+			addTouchPad('LEFT_FULL', 'A_B_C_X_Y');
 		#end
 
 		super.create();
@@ -327,12 +331,12 @@ class FreeplayState extends ScriptedState
 			}
 		}
 
-		if(FlxG.keys.justPressed.CONTROL && !player.playingMusic)
+		if((FlxG.keys.justPressed.CONTROL || controls.mobileJustPressed(MobileInputID.C)) && !player.playingMusic)
 		{
 			persistentUpdate = false;
 			openSubState(new GameplayChangersSubState());
 		}
-		else if(FlxG.keys.justPressed.SPACE)
+		else if(FlxG.keys.justPressed.SPACE || controls.mobileJustPressed(MobileInputID.X))
 		{
 			if (instPlaying != curSelected && !player.playingMusic && callOnScriptsExt('onMusicPlayer', [true, curSelected], [true, songs[curSelected]], true) != psychlua.LuaUtils.Function_Stop)
 			{
@@ -460,7 +464,7 @@ class FreeplayState extends ScriptedState
 			DiscordClient.loadModRPC();
 			#end
 		}
-		else if(controls.RESET && !player.playingMusic)
+		else if((controls.RESET || controls.mobileJustPressed(MobileInputID.Y)) && !player.playingMusic)
 		{
 			persistentUpdate = false;
 			openSubState(new ResetScoreSubState(songs[curSelected].songName, curDifficulty, songs[curSelected].songCharacter));
