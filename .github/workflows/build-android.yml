@@ -36,10 +36,24 @@ jobs:
       ANDROID_NDK_VERSION: 29.0.14206865
       HXCPP_COMPILE_CACHE: ${{ github.workspace }}/.hxcpp_cache
       HXCPP_CACHE_MB: 4000
-      GRADLE_OPTS: -Dorg.gradle.parallel=true -Dorg.gradle.caching=true
+      # hxcpp compiles one .cpp at a time unless told otherwise; runners have 4 vCPU
+      HXCPP_COMPILE_THREADS: 4
+      GRADLE_OPTS: -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.jvmargs=-Xmx4g
 
     steps:
       - uses: actions/checkout@v4
+
+      # The image ships ~20 GB of toolchains this build never touches; running out of
+      # disk is what breaks :app:packageRelease
+      - name: Free disk space
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          for d in "$SDK"/ndk/*; do
+            [ -e "$d" ] || continue
+            [ "$(basename "$d")" = "$ANDROID_NDK_VERSION" ] || sudo rm -rf "$d"
+          done
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/share/swift
+          df -h /
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -159,7 +173,7 @@ jobs:
 
       # Save even if the build fails, but not on PRs
       - name: Save hxcpp objects
-        if: ${{ always() && github.event_name != 'pull_request' }}
+        if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: actions/cache/save@v4
         with:
           path: .hxcpp_cache

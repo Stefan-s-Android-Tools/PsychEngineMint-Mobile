@@ -143,6 +143,10 @@ class PauseSubState extends ScriptedSubState
 		regenMenu();
 		cameras = [FlxG.cameras.list[FlxG.cameras.list.length - 1]];
 
+		#if mobile
+			addTouchPad(PlayState.chartingMode ? 'LEFT_FULL' : 'UP_DOWN', 'A_B');
+		#end
+
 		super.create();
 	}
 	

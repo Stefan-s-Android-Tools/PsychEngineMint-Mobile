@@ -43,6 +43,7 @@ import haxe.io.Path;
 
 import backend.Highscore;
 import backend.ScriptedState;
+import mobile.backend.MobileScaleMode;
 
 // NATIVE API STUFF, YOU CAN IGNORE THIS AND SCROLL //
 #if (linux && !debug)
@@ -84,7 +85,22 @@ class Main extends Sprite
 		
 		// Credits to MAJigsaw77 (he's the og author for this code)
 		#if android
-		Sys.setCwd(Path.addTrailingSlash(Context.getExternalFilesDir()));
+		var storageDir:String = mobile.backend.StorageUtil.getStorageDirectory();
+		final fallbackDir:String = Path.addTrailingSlash(Context.getExternalFilesDir());
+
+		mobile.backend.StorageUtil.createDirectories(storageDir);
+		if (!mobile.backend.StorageUtil.isWritable(storageDir))
+		{
+			trace('Cannot write to "$storageDir", falling back to "$fallbackDir"');
+			storageDir = fallbackDir;
+		}
+		else if (!FileSystem.exists(storageDir + 'saves') && FileSystem.exists(fallbackDir + 'saves'))
+		{
+			// first launch after switching to external storage: bring the old data along
+			mobile.backend.StorageUtil.copyContents(fallbackDir, storageDir, ['mods', 'saves', 'crash', 'logs']);
+		}
+
+		Sys.setCwd(storageDir);
 		#elseif ios
 		Sys.setCwd(lime.system.System.applicationStorageDirectory);
 		#end
@@ -150,6 +166,13 @@ class Main extends Sprite
 		DiscordClient.prepare();
 		#end
 		
+		#if android FlxG.android.preventDefaultKeys = [flixel.input.android.FlxAndroidKey.BACK]; #end
+
+		#if mobile
+		lime.system.System.allowScreenTimeout = ClientPrefs.data.screensaver;
+		FlxG.scaleMode = new MobileScaleMode();
+		#end
+
 		// shader coords fix
 		FlxG.signals.gameResized.add((w:Int, h:Int) -> {
 		     if (FlxG.cameras != null) {

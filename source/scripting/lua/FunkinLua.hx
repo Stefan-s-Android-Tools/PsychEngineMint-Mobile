@@ -33,6 +33,7 @@ import substates.PauseSubState;
 import substates.GameOverSubstate;
 
 import scripting.lua.LuaUtils;
+import mobile.psychlua.MobileFunctions;
 #if HSCRIPT_ALLOWED
 import psychlua.HScript;
 #end
@@ -470,6 +471,7 @@ class FunkinLua implements FunkinScript {
 		CustomState.implement();
 		TextFunctions.implement();
 		ExtraFunctions.implement();
+		MobileFunctions.implement();
 		CustomSubState.implement();
 		ReflectionFunctions.implement();
 		DeprecatedFunctions.implement();
@@ -483,6 +485,7 @@ class FunkinLua implements FunkinScript {
 	
 	public function implementLocal():Void {
 		ShaderFunctions.implementLocal(this);
+		MobileFunctions.implementLocal(this);
 		ReflectionFunctions.implementLocal(this);
 		#if HSCRIPT_ALLOWED HScript.implementLocal(this); #end
 		

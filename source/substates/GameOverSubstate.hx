@@ -126,6 +126,10 @@ class GameOverSubstate extends ScriptedSubState
 			}
 		}
 
+		#if mobile
+			addTouchPad('NONE', 'A_B');
+		#end
+
 		super.create();
 	}
 

@@ -37,7 +37,7 @@ class Paths
 			dumpExclusions.push(key);
 	}
 
-	public static var dumpExclusions:Array<String> = ['assets/shared/music/freakyMenu.$SOUND_EXT'];
+	public static var dumpExclusions:Array<String> = ['assets/shared/music/freakyMenu.$SOUND_EXT', 'assets/shared/mobile/images/touchpad/bg.png'];
 	// haya I love you for the base cache dump I took to the max
 	public static function clearUnusedMemory()
 	{
@@ -164,7 +164,12 @@ class Paths
 		#end
 
 		if (parentfolder != null)
+		{
+			if (parentfolder == "mobile")
+				return getSharedPath('mobile/$file');
+
 			return getFolderPath(file, parentfolder);
+		}
 
 		if (currentLevel != null && currentLevel != 'shared')
 		{
@@ -183,6 +188,28 @@ class Paths
 
 	inline public static function getSharedPath(file:String = '')
 		return 'assets/shared/$file';
+
+	/**
+	 * Lists the files inside a directory, falling back to the embedded
+	 * assets list when the folder does not exist on the filesystem.
+	 */
+	public static function readDirectory(directory:String):Array<String>
+	{
+		var files:Array<String> = [];
+
+		#if sys
+		if (FileSystem.exists(directory) && FileSystem.isDirectory(directory))
+			return FileSystem.readDirectory(directory);
+		#end
+
+		for (path in OpenFlAssets.list())
+		{
+			if (path.startsWith('$directory/') && !files.contains(path))
+				files.push(path);
+		}
+
+		return files;
+	}
 
 	inline static public function txt(key:String, ?folder:String)
 		return getPath('data/$key.txt', TEXT, folder, true);

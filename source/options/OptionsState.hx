@@ -12,8 +12,9 @@ class OptionsState extends ScriptedState
 		'Graphics',
 		'Visuals',
 		'Gameplay'
+		#if mobile , 'Mobile Options' #end
 		#if TRANSLATIONS_ALLOWED , 'Language' #end
-	];
+		];
 	private static var curSelected:Int = 0;
 	public static var onPlayState:Bool = false;
 	
@@ -34,7 +35,19 @@ class OptionsState extends ScriptedState
 
 	override function create() {
 		optionFunctions['Note Colors'] = () -> openSubState(new options.NotesColorSubState());
-		optionFunctions['Controls'] = () -> openSubState(new options.ControlsSubState());
+		optionFunctions['Controls'] = () -> {
+			#if mobile
+			if (controls.mobileC) {
+				persistentUpdate = false;
+				openSubState(new mobile.substates.MobileControlSelectSubState());
+				return;
+			}
+			#end
+			openSubState(new options.ControlsSubState());
+		};
+		#if mobile
+		optionFunctions['Mobile Options'] = () -> openSubState(new mobile.options.MobileOptionsSubState());
+		#end
 		optionFunctions['Graphics'] = () -> openSubState(new options.GraphicsSettingsSubState());
 		optionFunctions['Visuals'] = () -> openSubState(new options.VisualsSettingsSubState());
 		optionFunctions['Gameplay'] = () -> openSubState(new options.GameplaySettingsSubState());
@@ -69,6 +82,10 @@ class OptionsState extends ScriptedState
 
 		changeSelection();
 		ClientPrefs.saveSettings();
+
+		#if mobile
+			addTouchPad('UP_DOWN', 'A_B');
+		#end
 
 		super.create();
 	}

@@ -153,6 +153,10 @@ class MainMenuState extends ScriptedState
 		
 		add(menuItems);
 		
+		#if mobile
+			addTouchPad('UP_DOWN', 'A_B');
+		#end
+
 		super.create();
 		
 		changeItem(true);

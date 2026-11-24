@@ -103,6 +103,10 @@ class MasterEditorMenu extends ScriptedSubState
 		
 		persistentUpdate = persistentDraw = true;
 		FlxG.mouse.visible = false;
+		#if mobile
+			addTouchPad('LEFT_FULL', 'A_B');
+		#end
+
 		super.create();
 	}
 

@@ -1,6 +1,12 @@
 package backend;
 
 import shaders.ErrorHandledShader;
+import flixel.util.FlxDestroyUtil;
+
+import mobile.backend.MobileData;
+import mobile.objects.Hitbox;
+import mobile.objects.IMobileControls;
+import mobile.objects.TouchPad;
 
 #if GLOBAL_SCRIPTS
 import scripting.hscript.FunkinModuleCollection;
@@ -66,6 +72,97 @@ class MusicBeatSubstate extends flixel.FlxSubState {
 	public var autoUpdateRPC:Bool = true; //performance setting for custom RPC things
 	
 	public var parent:flixel.FlxState = null;
+
+	// --- Mobile controls ---
+	public var touchPad:TouchPad;
+	public var mobileControls:IMobileControls;
+	public var camControls:FlxCamera;
+	public var tpadCam:FlxCamera;
+
+	/**
+	 * Returns the object that should receive mobile input: the deepest open
+	 * `MusicBeatSubstate`, or the current state if there is none.
+	 */
+	public static function getInputTarget():MusicBeatSubstate {
+		var target:MusicBeatSubstate = Std.isOfType(FlxG.state, MusicBeatSubstate) ? cast FlxG.state : null;
+		var current:flixel.FlxState = FlxG.state;
+		while (current.subState != null) {
+			current = current.subState;
+			if (Std.isOfType(current, MusicBeatSubstate))
+				target = cast current;
+		}
+		return target;
+	}
+
+	public function addTouchPad(DPad:String, Action:String) {
+		touchPad = new TouchPad(DPad, Action);
+		add(touchPad);
+	}
+
+	public function removeTouchPad() {
+		if (touchPad != null) {
+			remove(touchPad);
+			touchPad = FlxDestroyUtil.destroy(touchPad);
+		}
+
+		if (tpadCam != null) {
+			FlxG.cameras.remove(tpadCam);
+			tpadCam = FlxDestroyUtil.destroy(tpadCam);
+		}
+	}
+
+	public function addTouchPadCamera(defaultDrawTarget:Bool = false):Void {
+		if (touchPad != null) {
+			tpadCam = new FlxCamera();
+			tpadCam.bgColor.alpha = 0;
+			FlxG.cameras.add(tpadCam, defaultDrawTarget);
+			touchPad.cameras = [tpadCam];
+		}
+	}
+
+	public function addMobileControls(defaultDrawTarget:Bool = false):Void {
+		var extraMode:ExtraActions = MobileData.extraActions.get(ClientPrefs.data.extraButtons);
+
+		switch (MobileData.mode) {
+			case 0: // RIGHT_FULL
+				mobileControls = new TouchPad('RIGHT_FULL', 'NONE', extraMode);
+			case 1: // LEFT_FULL
+				mobileControls = new TouchPad('LEFT_FULL', 'NONE', extraMode);
+			case 2: // CUSTOM
+				mobileControls = MobileData.getTouchPadCustom(new TouchPad('RIGHT_FULL', 'NONE', extraMode));
+			case 3: // HITBOX
+				mobileControls = new Hitbox(extraMode);
+		}
+
+		mobileControls.instance = MobileData.setButtonsColors(mobileControls.instance);
+		camControls = new FlxCamera();
+		camControls.bgColor.alpha = 0;
+		FlxG.cameras.add(camControls, defaultDrawTarget);
+
+		mobileControls.instance.cameras = [camControls];
+		mobileControls.instance.visible = false;
+		add(mobileControls.instance);
+	}
+
+	public function removeMobileControls() {
+		if (mobileControls != null) {
+			remove(mobileControls.instance);
+			mobileControls.instance = FlxDestroyUtil.destroy(mobileControls.instance);
+			mobileControls = null;
+		}
+
+		if (camControls != null) {
+			FlxG.cameras.remove(camControls);
+			camControls = FlxDestroyUtil.destroy(camControls);
+		}
+	}
+
+	public override function destroy():Void {
+		removeTouchPad();
+		removeMobileControls();
+
+		super.destroy();
+	}
 	
 	public function new() {
 		super();

@@ -80,6 +80,9 @@ class TitleState extends ScriptedState
 			}
 			persistentUpdate = true;
 			persistentDraw = true;
+			#if mobile
+			mobile.backend.MobileData.init();
+			#end
 		}
 
 		FlxG.mouse.visible = false;

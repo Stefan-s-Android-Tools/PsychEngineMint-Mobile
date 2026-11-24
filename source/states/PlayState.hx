@@ -33,6 +33,11 @@ import substates.GameOverSubstate;
 import openfl.filters.ShaderFilter;
 #end
 
+import mobile.backend.MobileData.ExtraActions;
+import mobile.input.MobileInputID;
+import mobile.objects.IMobileControls;
+import mobile.objects.TouchPad;
+
 import objects.VideoSprite;
 import objects.Note.EventNote;
 import objects.*;
@@ -49,6 +54,7 @@ import psychlua.HScript;
 class PlayStateInput extends FlxBasic { // loosely based on nve
 	public var keyBinds:Array<Array<FlxKey>> = [];
 	public var gamepadBinds:Array<Array<flixel.input.gamepad.FlxGamepadInputID>> = [];
+	public var mobileBinds:Array<Array<MobileInputID>> = [];
 	public var activeInputs:Array<Bool> = [];
 	
 	var gamepads:Array<FlxGamepad> = [];
@@ -69,6 +75,31 @@ class PlayStateInput extends FlxBasic { // loosely based on nve
 	}
 	public function populate(i:Int):Void {
 		activeInputs = [for (_ in 0 ... i) false];
+	}
+
+	override function update(elapsed:Float):Void {
+		super.update(elapsed);
+
+		if (mobileBinds.length < 1) return;
+
+		var controls = Controls.instance;
+		if (controls == null) return;
+
+		var target = controls.requestedInstance;
+		var pad = target != null ? target.touchPad : null;
+		var mobileC = controls.requestedMobileC;
+		var mobileInstance = mobileC != null ? mobileC.instance : null;
+
+		for (i in 0 ... mobileBinds.length) {
+			var keys = mobileBinds[i];
+			if (keys == null || keys.length < 1) continue;
+
+			var down:Bool = false;
+			if (pad != null) down = pad.anyPressed(keys);
+			if (!down && mobileInstance != null) down = mobileInstance.anyPressed(keys);
+
+			doInput(i, down);
+		}
 	}
 	
 	var gamepadEvents:Map<FlxGamepad, Dynamic> = [];
@@ -647,15 +678,19 @@ class PlayState extends ScriptedState
 	public var introSoundsSuffix:String = '';
 	
 	public var input:PlayStateInput;
+	public var luaTouchPad:TouchPad;
+	public var luaTpadCam:FlxCamera;
 	public var keysArray(default, set):Array<String>;
 	function set_keysArray(array:Array<String>):Array<String> {
 		input.keyBinds.resize(0);
 		input.gamepadBinds.resize(0);
+		input.mobileBinds.resize(0);
 		input.populate(array.length);
-		
+
 		for (bind in array) {
 			input.keyBinds.push(Controls.instance.keyboardBinds.get(bind).copy());
 			input.gamepadBinds.push(Controls.instance.gamepadBinds.get(bind).copy());
+			input.mobileBinds.push(Controls.instance.mobileBinds.get(bind)?.copy() ?? []);
 		}
 		
 		return keysArray = array;
@@ -719,7 +754,11 @@ class PlayState extends ScriptedState
 		camHUD = new FlxCamera();
 		camHUD.bgColor.alpha = 0;
 
+		luaTpadCam = new FlxCamera();
+		luaTpadCam.bgColor.alpha = 0;
+
 		FlxG.cameras.add(camHUD, false);
+		FlxG.cameras.add(luaTpadCam, false);
 
 		persistentUpdate = true;
 		persistentDraw = true;
@@ -1039,6 +1078,18 @@ class PlayState extends ScriptedState
 		resetRPC();
 		
 		stagesFunc(function(stage:BaseStage) stage.createPost());
+
+		#if mobile
+		addMobileControls();
+		if (mobileControls != null && mobileControls.instance != null)
+			mobileControls.instance.visible = true;
+
+		#if !android
+		addTouchPad('NONE', 'P');
+		addTouchPadCamera();
+		#end
+		#end
+
 		super.create();
 		Paths.clearUnusedMemory();
 		
@@ -2337,7 +2388,7 @@ class PlayState extends ScriptedState
 			botplayTxt.alpha = 1 - Math.sin((Math.PI * botplaySine) / 180);
 		}
 
-		if (controls.PAUSE && startedCountdown && canPause)
+		if ((controls.PAUSE #if android || FlxG.android.justReleased.BACK #end) && startedCountdown && canPause)
 		{
 			var ret:Dynamic = callOnScripts('onPause', null, true);
 			if(ret != LuaUtils.Function_Stop) {
@@ -3070,6 +3121,11 @@ class PlayState extends ScriptedState
 	var transitioning = false;
 	public function endSong()
 	{
+		if (mobileControls != null && mobileControls.instance != null)
+			mobileControls.instance.visible = false;
+		if (touchPad != null)
+			touchPad.visible = false;
+
 		//Should kill you if you tried to cheat
 		if(!startingSong)
 		{
@@ -4038,4 +4094,73 @@ class PlayState extends ScriptedState
 		}
 	}
 	#end
+
+	public function makeLuaTouchPad(DPadMode:String, ActionMode:String) {
+		if (luaTouchPad != null && members.contains(luaTouchPad)) return;
+
+		if (!variables.exists('luaTouchPad'))
+			variables.set('luaTouchPad', luaTouchPad);
+
+		luaTouchPad = new TouchPad(DPadMode, ActionMode, ExtraActions.NONE);
+		luaTouchPad.alpha = ClientPrefs.data.controlsAlpha;
+	}
+
+	public function addLuaTouchPad() {
+		if (luaTouchPad == null || members.contains(luaTouchPad)) return;
+
+		var target = LuaUtils.getTargetInstance();
+		target.insert(target.members.length + 1, luaTouchPad);
+	}
+
+	public function addLuaTouchPadCamera() {
+		if (luaTouchPad != null)
+			luaTouchPad.cameras = [luaTpadCam];
+	}
+
+	public function removeLuaTouchPad() {
+		if (luaTouchPad != null) {
+			luaTouchPad.kill();
+			remove(luaTouchPad);
+			luaTouchPad.destroy();
+			luaTouchPad = null;
+		}
+	}
+
+	public function luaTouchPadPressed(button:Dynamic):Bool {
+		return luaTouchPadButton(button, 'pressed');
+	}
+
+	public function luaTouchPadJustPressed(button:Dynamic):Bool {
+		return luaTouchPadButton(button, 'justPressed');
+	}
+
+	public function luaTouchPadJustReleased(button:Dynamic):Bool {
+		return luaTouchPadButton(button, 'justReleased');
+	}
+
+	function luaTouchPadButton(button:Dynamic, state:String):Bool {
+		if (luaTouchPad == null) return false;
+
+		if (Std.isOfType(button, String)) {
+			var id = MobileInputID.fromString(button);
+			return switch (state) {
+				case 'pressed': luaTouchPad.buttonPressed(id);
+				case 'justPressed': luaTouchPad.buttonJustPressed(id);
+				default: luaTouchPad.buttonJustReleased(id);
+			};
+		}
+
+		if (Std.isOfType(button, Array)) {
+			var ids:Array<MobileInputID> = [];
+			for (id in (button:Array<Dynamic>))
+				ids.push(MobileInputID.fromString(id));
+			return switch (state) {
+				case 'pressed': luaTouchPad.anyPressed(ids);
+				case 'justPressed': luaTouchPad.anyJustPressed(ids);
+				default: luaTouchPad.anyJustReleased(ids);
+			};
+		}
+
+		return false;
+	}
 }

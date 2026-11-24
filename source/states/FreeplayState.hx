@@ -186,6 +186,10 @@ class FreeplayState extends ScriptedState
 		
 		changeSelection();
 		updateTexts();
+		#if mobile
+			addTouchPad('LEFT_FULL', 'A_B');
+		#end
+
 		super.create();
 	}
 

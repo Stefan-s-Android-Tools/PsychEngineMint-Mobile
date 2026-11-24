@@ -184,6 +184,10 @@ class StoryMenuState extends ScriptedState
 		changeWeek();
 		changeDifficulty();
 
+		#if mobile
+			addTouchPad('LEFT_FULL', 'A_B');
+		#end
+
 		super.create();
 	}
 

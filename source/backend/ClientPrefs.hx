@@ -3,6 +3,7 @@ package backend;
 import flixel.util.FlxSave;
 import flixel.input.keyboard.FlxKey;
 import flixel.input.gamepad.FlxGamepadInputID;
+import mobile.input.MobileInputID;
 
 import states.TitleState;
 
@@ -77,6 +78,16 @@ import states.TitleState;
 	public var discordRPC:Bool = true;
 	public var loadingScreen:Bool = true;
 	public var language:String = 'en-US';
+
+	// Mobile
+	public var extraButtons:String = 'NONE';
+	public var hitbox2:Bool = false;
+	public var dynamicColors:Bool = false;
+	public var controlsAlpha:Float = FlxG.onMobile ? 0.6 : 0;
+	public var screensaver:Bool = false;
+	public var wideScreen:Bool = true;
+	public var hitboxType:String = 'Gradient';
+	public var storageType:String = 'EXTERNAL';
 }
 
 class ClientPrefs {
@@ -126,6 +137,31 @@ class ClientPrefs {
 	];
 	public static var defaultKeys:Map<String, Array<FlxKey>> = null;
 	public static var defaultButtons:Map<String, Array<FlxGamepadInputID>> = null;
+	//Mobile Controls Binds
+	public static var mobileBinds:Map<String, Array<MobileInputID>> = [
+		'note_up'		=> [UP, NOTE_UP],
+		'note_left'		=> [LEFT, NOTE_LEFT],
+		'note_down'		=> [DOWN, NOTE_DOWN],
+		'note_right'	=> [RIGHT, NOTE_RIGHT],
+
+		'ui_up'			=> [UP],
+		'ui_left'		=> [LEFT],
+		'ui_down'		=> [DOWN],
+		'ui_right'		=> [RIGHT],
+
+		'accept'		=> [A],
+		'back'			=> [B],
+		'pause'			=> [P],
+		'reset'			=> [NONE],
+
+		'volume_mute'	=> [NONE],
+		'volume_up'		=> [NONE],
+		'volume_down'	=> [NONE],
+
+		'debug_1'		=> [NONE],
+		'debug_2'		=> [NONE]
+	];
+	public static var defaultMobileBinds:Map<String, Array<MobileInputID>> = null;
 	
 	public static var modsEnabled:Map<String, Bool> = [];
 	
@@ -143,14 +179,21 @@ class ClientPrefs {
 			for (button in gamepadBinds.keys())
 				if(defaultButtons.exists(button))
 					gamepadBinds.set(button, defaultButtons.get(button).copy());
+
+		if(defaultMobileBinds != null)
+			for (button in mobileBinds.keys())
+				if(defaultMobileBinds.exists(button))
+					mobileBinds.set(button, defaultMobileBinds.get(button).copy());
 	}
 
 	public static function clearInvalidKeys(key:String)
 	{
 		var keyBind:Array<FlxKey> = keyBinds.get(key);
 		var gamepadBind:Array<FlxGamepadInputID> = gamepadBinds.get(key);
+		var mobileBind:Array<MobileInputID> = mobileBinds.get(key);
 		while(keyBind != null && keyBind.contains(NONE)) keyBind.remove(NONE);
 		while(gamepadBind != null && gamepadBind.contains(NONE)) gamepadBind.remove(NONE);
+		while(mobileBind != null && mobileBind.contains(NONE)) mobileBind.remove(NONE);
 	}
 
 	public static function saveSettings() {
@@ -163,6 +206,7 @@ class ClientPrefs {
 		
 		controlsSave.data.keyboard = keyBinds;
 		controlsSave.data.gamepad = gamepadBinds;
+		controlsSave.data.mobile = mobileBinds;
 		controlsSave.flush();
 		
 		modsSave.data.modsEnabled = modsEnabled;
@@ -177,6 +221,7 @@ class ClientPrefs {
 		
 		defaultKeys ??= keyBinds.copy();
 		defaultButtons ??= gamepadBinds.copy();
+		defaultMobileBinds ??= mobileBinds.copy();
 
 		for (key in Reflect.fields(data))
 			if (key != 'gameplaySettings' && Reflect.hasField(FlxG.save.data, key))
@@ -232,6 +277,7 @@ class ClientPrefs {
 		
 		var loadedKeyboard:Map<String, Array<FlxKey>> = controlsSave.data.keyboard;
 		var loadedGamepad:Map<String, Array<FlxGamepadInputID>> = controlsSave.data.gamepad;
+		var loadedMobile:Map<String, Array<MobileInputID>> = controlsSave.data.mobile;
 		var loadedMods:Map<String, Bool> = modsSave.data.modsEnabled;
 		
 		if (loadedKeyboard != null) {
@@ -241,6 +287,10 @@ class ClientPrefs {
 		if (loadedGamepad != null) {
 			for (control => keys in loadedGamepad)
 				if (gamepadBinds.exists(control)) gamepadBinds.set(control, keys);
+		}
+		if (loadedMobile != null) {
+			for (control => keys in loadedMobile)
+				if (mobileBinds.exists(control)) mobileBinds.set(control, keys);
 		}
 		if (loadedMods != null) {
 			for (mod => enabled in loadedMods)
